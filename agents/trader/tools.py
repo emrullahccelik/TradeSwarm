@@ -61,7 +61,6 @@ def get_account_balance(asset: str = None) -> str:
     try:
         account_info = client.get_account()
         balances = account_info.get("balances", [])
-        
         if asset:
             for balance in balances:
                 if balance["asset"].upper() == asset.upper():
