@@ -45,12 +45,19 @@ def ask_market_analyzer(query: str) -> str:
     except Exception as e:
         return f"Market Analyzer Agent Hatası: {str(e)}"
 
+from langgraph.checkpoint.memory import MemorySaver
+from langchain.chat_models import init_chat_model
+
+memory = MemorySaver()
+
 def create_orchestrator_agent():
-    llm = ChatOpenAI(
-        model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+    llm = init_chat_model(
+        model=os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash"),
+        model_provider="openai",
         api_key=os.getenv("OPENROUTER_API_KEY"),
         base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-        temperature=0.2
+        temperature=0.2,
+        model_kwargs={"extra_body": {"include_reasoning": True}}
     )
 
     tools = [ask_trader, ask_researcher, ask_market_analyzer]
@@ -73,7 +80,7 @@ def create_orchestrator_agent():
         "- Mümkün olduğunca detaylı ve karar destekleyici bir üslup kullan."
     )
 
-    agent = create_agent(llm, tools=tools, system_prompt=system_prompt)
+    agent = create_agent(llm, tools=tools, system_prompt=system_prompt, checkpointer=memory)
     return agent
 
 if __name__ == "__main__":
