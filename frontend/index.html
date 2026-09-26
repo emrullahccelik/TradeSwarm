@@ -113,7 +113,7 @@
         let currentSessionId = null;
         let isGenerating = false;
         let abortController = null;
-        let activeSubAgent = null;
+        let if (activeSubAgent === runId) activeSubAgent = null;
 
         // UI Elements
         const chatForm = document.getElementById('chat-form');
@@ -136,6 +136,11 @@
                 sessionList.innerHTML = '';
                 
                 sessions.forEach(session => {
+                    // Aktif sohbetin başlığı DB'de güncellendiyse (Yapay Zeka başlık attıysa) başlığı senkronize et
+                    if (session.id === currentSessionId) {
+                        headerTitle.textContent = session.title;
+                    }
+                    
                     const btn = document.createElement('div');
                     btn.className = `sidebar-item w-full px-3 py-2.5 rounded-lg text-sm text-zinc-300 flex items-center justify-between group ${session.id === currentSessionId ? 'active text-indigo-300' : ''}`;
                     
@@ -308,32 +313,35 @@
                 messageBox.innerHTML = marked.parse(messageBox.dataset.rawText);
             } 
             else if (type === 'sub_agent_start') {
-                activeSubAgent = toolName;
+                const runId = data.run_id || toolName;
+                activeSubAgent = runId;
                 const agentNames = { 'ask_trader': 'Trader Ajanı', 'ask_researcher': 'Araştırmacı Ajan', 'ask_market_analyzer': 'Piyasa Analisti' };
                 const displayName = agentNames[toolName] || toolName;
 
                 const subBox = document.createElement('div');
-                subBox.id = `sub-agent-${id}-${toolName}`;
+                subBox.id = `sub-agent-${id}-${runId}`;
                 subBox.className = 'w-full bg-zinc-950 border-2 border-indigo-500/30 rounded-xl p-4 mb-3 shadow-lg';
                 subBox.innerHTML = `
                     <div class="flex items-center gap-2 mb-3 text-indigo-400 font-bold uppercase tracking-wider text-sm">
                         <i class="fa-solid fa-user-tie"></i> Alt Ajan Devrede: ${displayName}
                     </div>
-                    <div id="sub-agent-tools-${id}-${toolName}" class="flex flex-col gap-2 mb-2 w-full"></div>
-                    <div id="sub-agent-content-${id}-${toolName}" class="text-zinc-300 prose prose-invert w-full text-sm mt-3">
+                    <div id="sub-agent-tools-${id}-${runId}" class="flex flex-col gap-2 mb-2 w-full"></div>
+                    <div id="sub-agent-content-${id}-${runId}" class="text-zinc-300 prose prose-invert w-full text-sm mt-3">
                         <i class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i> Analiz ediliyor...
                     </div>
                 `;
                 container.insertBefore(subBox, messageBox);
             }
             else if (type === 'sub_agent_end') {
-                const contentDiv = document.getElementById(`sub-agent-content-${id}-${toolName}`);
+                const runId = data.run_id || toolName;
+                const contentDiv = document.getElementById(`sub-agent-content-${id}-${runId}`);
                 if (contentDiv) {
                     contentDiv.innerHTML = marked.parse(text);
                 }
-                activeSubAgent = null;
+                if (activeSubAgent === runId) activeSubAgent = null;
             }
             else if (type === 'tool_start') {
+                const runId = data.run_id || toolName; // fallback to toolName if run_id is missing
                 let targetContainer = activeSubAgent 
                     ? document.getElementById(`sub-agent-tools-${id}-${activeSubAgent}`)
                     : document.getElementById(`tools-${id}`);
@@ -346,13 +354,14 @@
                 }
                 
                 const toolBadge = document.createElement('div');
-                toolBadge.id = `tool-${id}-${toolName}`;
+                toolBadge.id = `tool-${id}-${runId}`;
                 toolBadge.className = 'text-xs text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-md px-2 py-1 w-fit flex items-center gap-2';
                 toolBadge.innerHTML = `<i class="fa-solid fa-gear fa-spin"></i> <span>Araç çalışıyor: <b>${toolName}</b>...</span>`;
                 if (targetContainer) targetContainer.appendChild(toolBadge);
             }
             else if (type === 'tool_end') {
-                const toolBadge = document.getElementById(`tool-${id}-${toolName}`);
+                const runId = data.run_id || toolName;
+                const toolBadge = document.getElementById(`tool-${id}-${runId}`);
                 if (toolBadge) {
                     toolBadge.className = 'text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2 py-1 w-fit flex items-center gap-2 transition-all';
                     toolBadge.innerHTML = `<i class="fa-solid fa-check"></i> <span>Görev bitti: <b>${toolName}</b></span>`;

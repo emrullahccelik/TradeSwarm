@@ -93,29 +93,35 @@ async def generate_chat_events(message: str, session_id: str, db):
             sub_agents = ["ask_trader", "ask_researcher", "ask_market_analyzer"]
             
             if kind == "on_tool_start":
+                run_id = event.get("run_id", "")
                 if name in sub_agents:
                     current_sub_agent = name
-                    payload = {"type": "sub_agent_start", "tool": name}
+                    payload = {"type": "sub_agent_start", "tool": name, "run_id": run_id}
                     ui_state.append(payload)
                 else:
-                    payload = {"type": "tool_start", "tool": name}
+                    payload = {"type": "tool_start", "tool": name, "run_id": run_id}
                     ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
             elif kind == "on_tool_end":
+                run_id = event.get("run_id", "")
                 if name in sub_agents:
                     output = event["data"].get("output", "")
                     if hasattr(output, "content"):
                         output = output.content
-                    payload = {"type": "sub_agent_end", "tool": name, "text": str(output)}
+                    payload = {"type": "sub_agent_end", "tool": name, "text": str(output), "run_id": run_id}
                     ui_state.append(payload)
                     current_sub_agent = None
                 else:
-                    payload = {"type": "tool_end", "tool": name}
+                    payload = {"type": "tool_end", "tool": name, "run_id": run_id}
                     ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
             elif kind == "on_chat_model_stream":
+                # Eğer bir alt ajan çalışıyorsa, onun içsel düşüncelerini/üretimini ana ekrana basma (Sızıntıyı önle)
+                if current_sub_agent:
+                    continue
+                
                 chunk = event["data"].get("chunk")
                 
                 if chunk:
