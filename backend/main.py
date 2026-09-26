@@ -8,7 +8,7 @@ import asyncio
 
 from backend.db import init_db, AsyncSessionLocal, ChatSession, ChatMessage
 from backend.models import ChatRequest, SessionCreate
-from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, TITLE_GENERATOR_MODEL
+from backend.config import TITLE_MODEL, TITLE_API_KEY, TITLE_BASE_URL
 from agents.orchestrator.agent import create_orchestrator_agent
 from langchain.chat_models import init_chat_model
 
@@ -27,10 +27,10 @@ orchestrator = create_orchestrator_agent()
 async def generate_title_from_message(user_message: str, assistant_message: str) -> str:
     try:
         llm = init_chat_model(
-            model=TITLE_GENERATOR_MODEL,
+            model=TITLE_MODEL,
             model_provider="openai",
-            api_key=OPENROUTER_API_KEY,
-            base_url=OPENROUTER_BASE_URL,
+            api_key=TITLE_API_KEY,
+            base_url=TITLE_BASE_URL,
             temperature=0.7
         )
         prompt = f"Kullanıcı mesajı ve Asistanın cevabına dayanarak bu sohbet için 3-5 kelimelik kısa, öz ve ilgi çekici bir başlık oluştur. Sadece başlığı yaz, tırnak işareti kullanma.\n\nKullanıcı: {user_message}\n\nAsistan: {assistant_message}"

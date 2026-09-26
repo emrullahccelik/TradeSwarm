@@ -1,4 +1,4 @@
-from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL
+from backend.config import ORCHESTRATOR_MODEL, ORCHESTRATOR_API_KEY, ORCHESTRATOR_BASE_URL
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain.chat_models import init_chat_model
@@ -9,10 +9,10 @@ memory = MemorySaver()
 
 def create_orchestrator_agent():
     llm = init_chat_model(
-        model=OPENROUTER_MODEL,
+        model=ORCHESTRATOR_MODEL,
         model_provider="openai",
-        api_key=OPENROUTER_API_KEY,
-        base_url=OPENROUTER_BASE_URL,
+        api_key=ORCHESTRATOR_API_KEY,
+        base_url=ORCHESTRATOR_BASE_URL,
         temperature=0.2,
         model_kwargs={"extra_body": {"include_reasoning": True}}
     )

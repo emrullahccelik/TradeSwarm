@@ -11,11 +11,20 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 
 DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HOST}:{DB_PORT}/{POSTGRES_DB}"
 
-# OpenRouter
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash")
-TITLE_GENERATOR_MODEL = os.getenv("TITLE_GENERATOR_MODEL", "meta-llama/llama-3.1-8b-instruct")
+# ORCHESTRATOR AGENT LLM CONFIG
+ORCHESTRATOR_BASE_URL = os.getenv("ORCHESTRATOR_BASE_URL", "https://openrouter.ai/api/v1")
+ORCHESTRATOR_API_KEY = os.getenv("ORCHESTRATOR_API_KEY")
+ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", "deepseek/deepseek-v4-flash")
+
+# SUB AGENT LLM CONFIG
+SUB_AGENT_BASE_URL = os.getenv("SUB_AGENT_BASE_URL", "https://openrouter.ai/api/v1")
+SUB_AGENT_API_KEY = os.getenv("SUB_AGENT_API_KEY")
+SUB_AGENT_MODEL = os.getenv("SUB_AGENT_MODEL", "deepseek/deepseek-v4-flash")
+
+# TITLE GENERATOR LLM CONFIG
+TITLE_BASE_URL = os.getenv("TITLE_BASE_URL", "https://openrouter.ai/api/v1")
+TITLE_API_KEY = os.getenv("TITLE_API_KEY")
+TITLE_MODEL = os.getenv("TITLE_MODEL", "meta-llama/llama-3.1-8b-instruct")
 
 # Binance
 BINANCE_SPOT_API_KEY = os.getenv("BINANCE_SPOT_API_KEY")

@@ -1,4 +1,4 @@
-from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
+from backend.config import SUB_AGENT_MODEL, SUB_AGENT_API_KEY, SUB_AGENT_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
 
 
 from langchain_openai import ChatOpenAI
@@ -9,9 +9,9 @@ from agents.researcher.tools import search_market_news, extract_webpage_content
 
 def create_researcher_agent():
     llm = ChatOpenAI(
-        model=OPENROUTER_MODEL,
-        api_key=OPENROUTER_API_KEY,
-        base_url=OPENROUTER_BASE_URL,
+        model=SUB_AGENT_MODEL,
+        api_key=SUB_AGENT_API_KEY,
+        base_url=SUB_AGENT_BASE_URL,
         temperature=0.3
     )
 
