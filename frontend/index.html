@@ -32,69 +32,223 @@
             font-size: 0.875rem;
         }
         
-        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #09090b; }
+        ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+        
+        .sidebar-item { transition: all 0.2s; }
+        .sidebar-item:hover { background-color: #18181b; }
+        .sidebar-item.active { background-color: #27272a; border-left: 3px solid #4f46e5; }
     </style>
 </head>
-<body class="flex flex-col h-screen font-sans">
-    <header class="flex items-center gap-3 px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
-        <div class="p-2 bg-indigo-500/20 rounded-lg">
-            <i class="fa-solid fa-chart-network text-indigo-400 text-xl"></i>
-        </div>
-        <div>
-            <h1 class="text-lg font-bold text-zinc-100 tracking-tight">TradeSwarm</h1>
-            <p class="text-xs text-zinc-400">Multi-Agent Market Intelligence Terminal</p>
-        </div>
-    </header>
+<body class="flex h-screen font-sans overflow-hidden">
 
-    <main id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 flex flex-col">
-        <div class="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4 my-auto" id="empty-state">
-            <i class="fa-solid fa-robot text-5xl text-zinc-700"></i>
-            <p>Orchestrator ajanı dinliyor. Analiz, trade veya haber isteyebilirsiniz.</p>
+    <!-- Sidebar -->
+    <aside class="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col flex-shrink-0 transition-all duration-300">
+        <div class="p-4">
+            <button id="new-chat-btn" class="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2.5 px-4 rounded-xl transition-colors font-medium text-sm">
+                <i class="fa-solid fa-plus"></i> Yeni Sohbet
+            </button>
         </div>
+        
+        <div class="px-4 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+            Son Kullanılanlar
+        </div>
+        
+        <div id="session-list" class="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
+            <!-- Sessions will be loaded here -->
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="flex-1 flex flex-col h-full relative bg-zinc-900/30">
+        <header class="flex items-center gap-3 px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
+            <div class="p-2 bg-indigo-500/20 rounded-lg">
+                <i class="fa-solid fa-chart-network text-indigo-400 text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-zinc-100 tracking-tight">TradeSwarm</h1>
+                <p id="header-session-title" class="text-xs text-zinc-400">Yeni Sohbet</p>
+            </div>
+        </header>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 flex flex-col">
+            <div class="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4 my-auto" id="empty-state">
+                <i class="fa-solid fa-robot text-5xl text-zinc-700"></i>
+                <p>Orchestrator ajanı dinliyor. Analiz, trade veya haber isteyebilirsiniz.</p>
+            </div>
+        </div>
+
+        <footer class="p-4 md:p-6 max-w-4xl mx-auto w-full shrink-0 relative">
+            <form id="chat-form" class="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-2 rounded-2xl shadow-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition-all">
+                <input
+                    type="text"
+                    id="message-input"
+                    placeholder="Mesajınızı yazın..."
+                    class="flex-1 bg-transparent border-none text-zinc-200 placeholder-zinc-500 px-4 py-2 focus:outline-none"
+                    autocomplete="off"
+                />
+                <button
+                    type="button"
+                    id="stop-button"
+                    class="hidden p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600/40 transition-colors"
+                    title="Durdur"
+                >
+                    <i class="fa-solid fa-stop"></i>
+                </button>
+                <button
+                    type="submit"
+                    id="send-button"
+                    class="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </form>
+        </footer>
     </main>
 
-    <footer class="p-4 md:p-6 max-w-4xl mx-auto w-full shrink-0 relative">
-        <form id="chat-form" class="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-2 rounded-2xl shadow-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition-all">
-            <input
-                type="text"
-                id="message-input"
-                placeholder="Type your command..."
-                class="flex-1 bg-transparent border-none text-zinc-200 placeholder-zinc-500 px-4 py-2 focus:outline-none"
-                autocomplete="off"
-            />
-            <button
-                type="button"
-                id="stop-button"
-                class="hidden p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600/40 transition-colors"
-                title="Stop Generation"
-            >
-                <i class="fa-solid fa-stop"></i>
-            </button>
-            <button
-                type="submit"
-                id="send-button"
-                class="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-                <i class="fa-solid fa-paper-plane"></i>
-            </button>
-        </form>
-    </footer>
-
     <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let currentSessionId = null;
+        let isGenerating = false;
+        let abortController = null;
+        let activeSubAgent = null;
+
+        // UI Elements
         const chatForm = document.getElementById('chat-form');
         const messageInput = document.getElementById('message-input');
         const chatContainer = document.getElementById('chat-container');
         const emptyState = document.getElementById('empty-state');
         const sendButton = document.getElementById('send-button');
         const stopButton = document.getElementById('stop-button');
+        const sessionList = document.getElementById('session-list');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const headerTitle = document.getElementById('header-session-title');
 
-        let isGenerating = false;
-        let abortController = null;
+        // ==========================================
+        // SESSIONS MANAGEMENT
+        // ==========================================
+        async function loadSessions() {
+            try {
+                const res = await fetch(`${API_BASE}/sessions`);
+                const sessions = await res.json();
+                sessionList.innerHTML = '';
+                
+                sessions.forEach(session => {
+                    const btn = document.createElement('div');
+                    btn.className = `sidebar-item w-full px-3 py-2.5 rounded-lg text-sm text-zinc-300 flex items-center justify-between group ${session.id === currentSessionId ? 'active text-indigo-300' : ''}`;
+                    
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = 'flex items-center gap-2 truncate cursor-pointer flex-1';
+                    titleDiv.innerHTML = `<i class="fa-regular fa-message text-zinc-500"></i> <span class="truncate">${session.title}</span>`;
+                    titleDiv.onclick = () => switchSession(session.id, session.title);
 
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'text-zinc-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 ml-2';
+                    deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+                    deleteBtn.title = "Sohbeti Sil";
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        deleteSession(session.id);
+                    };
+
+                    btn.appendChild(titleDiv);
+                    btn.appendChild(deleteBtn);
+                    sessionList.appendChild(btn);
+                });
+            } catch (err) {
+                console.error("Session load error", err);
+            }
+        }
+
+        async function deleteSession(id) {
+            if (isGenerating) return;
+            if (!confirm('Bu sohbeti tamamen silmek istediğinize emin misiniz?')) return;
+            
+            try {
+                await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' });
+                if (id === currentSessionId) {
+                    handleNewChatBtn();
+                }
+                loadSessions();
+            } catch (err) {
+                console.error("Delete session error", err);
+            }
+        }
+
+        async function createNewSessionDB() {
+            try {
+                const res = await fetch(`${API_BASE}/sessions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: "Yeni Sohbet" })
+                });
+                return await res.json();
+            } catch (err) {
+                console.error("Create session error", err);
+                return null;
+            }
+        }
+
+        function handleNewChatBtn() {
+            if (isGenerating) return;
+            currentSessionId = null;
+            headerTitle.textContent = "Yeni Sohbet";
+            chatContainer.innerHTML = '';
+            chatContainer.appendChild(emptyState);
+            emptyState.style.display = 'flex';
+            
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active', 'text-indigo-300');
+            });
+        }
+
+        async function switchSession(id, title) {
+            if (isGenerating) return;
+            currentSessionId = id;
+            headerTitle.textContent = title;
+            chatContainer.innerHTML = '';
+            
+            // Re-fetch sessions to update active class
+            await loadSessions();
+
+            // Fetch messages for this session
+            try {
+                const res = await fetch(`${API_BASE}/sessions/${id}/messages`);
+                const messages = await res.json();
+                
+                if (messages.length === 0) {
+                    chatContainer.appendChild(emptyState);
+                    emptyState.style.display = 'flex';
+                } else {
+                    emptyState.style.display = 'none';
+                    messages.forEach(msg => {
+                        // Render past messages
+                        const elId = `history-${msg.id}`;
+                        createMessageElement(msg.role, elId);
+                        
+                        // If it has UI state (tool calls, reasoning), render them
+                        if (msg.ui_state && msg.ui_state.length > 0) {
+                            msg.ui_state.forEach(state => {
+                                updateMessage(elId, state.text || '', state.type, state.tool);
+                            });
+                        }
+                        // Render final content
+                        if (msg.content) {
+                            updateMessage(elId, msg.content, 'content', null);
+                        }
+                    });
+                }
+                scrollToBottom();
+            } catch (err) {
+                console.error("Messages load error", err);
+            }
+        }
+
+        // ==========================================
+        // UI RENDERING
+        // ==========================================
         function scrollToBottom() {
             chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
         }
@@ -140,33 +294,24 @@
             return id;
         }
 
-        let activeSubAgent = null; // Track if we are currently inside a sub-agent execution
-
         function updateMessage(id, text, type, toolName) {
             const container = document.getElementById(`content-container-${id}`);
             const messageBox = document.getElementById(`message-${id}`);
             const typingIndicator = document.getElementById(`typing-${id}`);
             
+            if (!container || !messageBox) return;
+
             if (type === 'content') {
                 if (typingIndicator) typingIndicator.remove();
-                if (!messageBox.dataset.rawText) {
-                    messageBox.dataset.rawText = '';
-                }
+                if (!messageBox.dataset.rawText) messageBox.dataset.rawText = '';
                 messageBox.dataset.rawText += text;
                 messageBox.innerHTML = marked.parse(messageBox.dataset.rawText);
             } 
             else if (type === 'sub_agent_start') {
                 activeSubAgent = toolName;
-                
-                // Güzel isim eşleştirmesi
-                const agentNames = {
-                    'ask_trader': 'Trader Ajanı',
-                    'ask_researcher': 'Araştırmacı Ajan',
-                    'ask_market_analyzer': 'Piyasa Analisti'
-                };
+                const agentNames = { 'ask_trader': 'Trader Ajanı', 'ask_researcher': 'Araştırmacı Ajan', 'ask_market_analyzer': 'Piyasa Analisti' };
                 const displayName = agentNames[toolName] || toolName;
 
-                // Create a sub-agent box ABOVE the main orchestrator text
                 const subBox = document.createElement('div');
                 subBox.id = `sub-agent-${id}-${toolName}`;
                 subBox.className = 'w-full bg-zinc-950 border-2 border-indigo-500/30 rounded-xl p-4 mb-3 shadow-lg';
@@ -189,18 +334,15 @@
                 activeSubAgent = null;
             }
             else if (type === 'tool_start') {
-                let targetContainer;
-                // If a sub-agent is active, put the tool call inside the sub-agent's tool list
-                if (activeSubAgent) {
-                    targetContainer = document.getElementById(`sub-agent-tools-${id}-${activeSubAgent}`);
-                } else {
-                    targetContainer = document.getElementById(`tools-${id}`);
-                    if (!targetContainer) {
-                        targetContainer = document.createElement('div');
-                        targetContainer.id = `tools-${id}`;
-                        targetContainer.className = 'flex flex-col gap-1 mb-2 w-full';
-                        container.insertBefore(targetContainer, messageBox);
-                    }
+                let targetContainer = activeSubAgent 
+                    ? document.getElementById(`sub-agent-tools-${id}-${activeSubAgent}`)
+                    : document.getElementById(`tools-${id}`);
+                
+                if (!targetContainer && !activeSubAgent) {
+                    targetContainer = document.createElement('div');
+                    targetContainer.id = `tools-${id}`;
+                    targetContainer.className = 'flex flex-col gap-1 mb-2 w-full';
+                    container.insertBefore(targetContainer, messageBox);
                 }
                 
                 const toolBadge = document.createElement('div');
@@ -229,9 +371,13 @@
                 const contentDiv = document.getElementById(`reasoning-content-${id}`);
                 contentDiv.textContent += text;
             }
-            
             scrollToBottom();
         }
+
+        // ==========================================
+        // EVENTS
+        // ==========================================
+        newChatBtn.addEventListener('click', handleNewChatBtn);
 
         stopButton.addEventListener('click', () => {
             if (abortController) {
@@ -249,6 +395,15 @@
             
             const message = messageInput.value.trim();
             if (!message || isGenerating) return;
+
+            // İlk mesaj gönderildiğinde henüz bir sohbet yoksa DB'de oluştur
+            if (!currentSessionId) {
+                const session = await createNewSessionDB();
+                if (session) {
+                    currentSessionId = session.id;
+                    headerTitle.textContent = session.title;
+                }
+            }
             
             messageInput.value = '';
             messageInput.disabled = true;
@@ -259,19 +414,19 @@
             abortController = new AbortController();
             
             // Add User message
-            createMessageElement('user', 'u-' + Date.now());
-            const userMsgElement = chatContainer.lastElementChild.querySelector('.prose');
-            userMsgElement.textContent = message;
+            const uId = 'u-' + Date.now();
+            createMessageElement('user', uId);
+            updateMessage(uId, message, 'content');
             
             // Add Assistant placeholder
             const msgId = Date.now().toString();
             createMessageElement('assistant', msgId);
             
             try {
-                const response = await fetch('http://localhost:8000/api/chat', {
+                const response = await fetch(`${API_BASE}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, session_id: 'default-session' }),
+                    body: JSON.stringify({ message: message, session_id: currentSessionId }),
                     signal: abortController.signal
                 });
 
@@ -289,7 +444,6 @@
                     
                     if (value) {
                         buffer += decoder.decode(value, { stream: true });
-                        
                         const parts = buffer.split('\n\n');
                         buffer = parts.pop(); 
                         
@@ -302,6 +456,8 @@
                                         done = true;
                                         const typingIndicator = document.getElementById(`typing-${msgId}`);
                                         if (typingIndicator) typingIndicator.remove();
+                                        // Update sidebar names
+                                        loadSessions();
                                     } else {
                                         updateMessage(msgId, data.text || '', data.type, data.tool);
                                     }
@@ -314,10 +470,8 @@
                 }
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    console.log('Stream aborted');
                     updateMessage(msgId, '\n\n**[İşlem İptal Edildi]**', 'content');
                 } else {
-                    console.error(err);
                     updateMessage(msgId, '\n\n**Hata:** Sunucuya bağlanılamadı.', 'content');
                     document.getElementById(`message-${msgId}`).classList.add('border-red-900/50', 'bg-red-950/20', 'text-red-400');
                 }
@@ -327,6 +481,19 @@
                 stopButton.style.display = 'none';
                 isGenerating = false;
                 messageInput.focus();
+            }
+        });
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadSessions();
+            if (!currentSessionId) {
+                // Fetch current list to select first, or show empty
+                if (sessionList.children.length > 0) {
+                    sessionList.children[0].click();
+                } else {
+                    handleNewChatBtn();
+                }
             }
         });
     </script>

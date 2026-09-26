@@ -1,15 +1,17 @@
-import json
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.future import select
+import json
+import asyncio
 
-# Ana ajanımızı içeri aktarıyoruz
+from backend.db import init_db, AsyncSessionLocal, ChatSession, ChatMessage
+from backend.models import ChatRequest, SessionCreate
 from agents.orchestrator.agent import create_orchestrator_agent
 
 app = FastAPI(title="TradeSwarm AI Backend")
 
-# Frontend'in (React vb.) API'ye erişebilmesi için CORS ayarları
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,25 +20,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Sunucu başlarken ajanı bir kez ayağa kaldırıyoruz
 orchestrator = create_orchestrator_agent()
 
-class ChatRequest(BaseModel):
-    message: str
-    session_id: str = "default_session"
+@app.on_event("startup")
+async def on_startup():
+    await init_db()
 
-async def generate_chat_events(message: str, session_id: str):
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
+async def generate_chat_events(message: str, session_id: str, db):
     """
     Kullanıcı mesajını alır, LangChain'in astream_events API'si ile çalıştırır.
     Gerçekleşen her olayı (Tool başlangıcı, bitişi, LLM kelimeleri, Akıl yürütme/reasoning) SSE formatında yayınlar.
     """
+    
+    # Kullanıcı mesajını DB'ye kaydet
+    user_msg = ChatMessage(session_id=session_id, role="user", content=message)
+    db.add(user_msg)
+    await db.commit()
+    
+    # Asistanın yanıtını biriktirmek için state
+    assistant_content = ""
+    ui_state = []
+    current_sub_agent = None
+
     try:
-        # Hafıza (Memory) için thread_id config ayarı
+        # DB'den geçmiş mesajları çekerek ajana hafıza (memory) sağlıyoruz (Sunucu restart olsa bile hatırlaması için)
+        past_msgs_result = await db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == session_id)
+            .order_by(ChatMessage.created_at.asc())
+        )
+        past_msgs = past_msgs_result.scalars().all()
+        
+        formatted_messages = []
+        for m in past_msgs:
+            # Sadece önceki mesajları alıyoruz (Şu anki user mesajı henüz commit edilmediği için listede son sırada olabilir)
+            # Biz yine de db'ye ekledik, o yüzden db'den gelen listeyi olduğu gibi kullanabiliriz!
+            if m.content:
+                formatted_messages.append({"role": m.role, "content": m.content})
+        
         config = {"configurable": {"thread_id": session_id}}
         
-        # LangChain v2 streaming events
         async for event in orchestrator.astream_events(
-            {"messages": [{"role": "user", "content": message}]},
+            {"messages": formatted_messages},
             config=config,
             version="v2"
         ):
@@ -45,89 +74,140 @@ async def generate_chat_events(message: str, session_id: str):
             
             sub_agents = ["ask_trader", "ask_researcher", "ask_market_analyzer"]
             
-            # --- TOOL / SUB-AGENT BAŞLAMA ANI ---
             if kind == "on_tool_start":
                 if name in sub_agents:
+                    current_sub_agent = name
                     payload = {"type": "sub_agent_start", "tool": name}
+                    ui_state.append(payload)
                 else:
                     payload = {"type": "tool_start", "tool": name}
+                    ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
-            # --- TOOL / SUB-AGENT BİTİŞ ANI ---
             elif kind == "on_tool_end":
                 if name in sub_agents:
-                    # Alt ajanın verdiği tam cevabı alıyoruz
                     output = event["data"].get("output", "")
-                    # ToolMessage formatındaysa içeriğini alalım
                     if hasattr(output, "content"):
                         output = output.content
                     payload = {"type": "sub_agent_end", "tool": name, "text": str(output)}
+                    ui_state.append(payload)
+                    current_sub_agent = None
                 else:
                     payload = {"type": "tool_end", "tool": name}
+                    ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
-            # --- ORCHESTRATOR'IN KELİME KELİME CEVABI (STREAMING) VE REASONING ---
             elif kind == "on_chat_model_stream":
                 chunk = event["data"].get("chunk")
                 
-                # Sadece Ana Ajanın (Orchestrator) kelimelerini stream etmek için basit bir kontrol:
-                # (Eğer event name 'agent' veya 'ChatOpenRouter' ise. Alt ajanlarınki 'ChatOpenAI' vs olabiliyor ama
-                # alt ajanlar tool içinde invoke edildiği için kendi stream'leri on_chat_model_stream'e düşmez,
-                # yine de filtreyi tutalım)
                 if chunk:
-                    # Notebook'taki yönteme göre reasoning kontrolü (content_blocks)
                     if hasattr(chunk, "content_blocks") and isinstance(chunk.content_blocks, list):
                         for block in chunk.content_blocks:
                             if isinstance(block, dict) and block.get("type") == "reasoning":
                                 reasoning_text = block.get("reasoning")
                                 if reasoning_text:
                                     payload = {"type": "reasoning", "text": reasoning_text}
+                                    ui_state.append(payload)
                                     yield f"data: {json.dumps(payload)}\n\n"
                     
-                    # Alternatif olarak chunk.content liste formatında geldiyse
                     elif isinstance(chunk.content, list):
                         for item in chunk.content:
                             if isinstance(item, dict) and item.get("type") == "reasoning":
                                 reasoning_text = item.get("reasoning")
                                 if reasoning_text:
                                     payload = {"type": "reasoning", "text": reasoning_text}
+                                    ui_state.append(payload)
                                     yield f"data: {json.dumps(payload)}\n\n"
                     
-                    # Ek fallback: OpenRouter'ın eski include_reasoning API formatı
                     reasoning_content = chunk.additional_kwargs.get("reasoning") or chunk.additional_kwargs.get("reasoning_content")
                     if reasoning_content:
                         payload = {"type": "reasoning", "text": reasoning_content}
+                        ui_state.append(payload)
                         yield f"data: {json.dumps(payload)}\n\n"
                     
-                    # Normal içerik token'ı (String olarak)
                     if isinstance(chunk.content, str) and chunk.content:
                         payload = {"type": "content", "text": chunk.content}
+                        assistant_content += chunk.content
                         yield f"data: {json.dumps(payload)}\n\n"
-                    # Eğer içerik blok/liste formatında text ise
                     elif isinstance(chunk.content, list):
                         for item in chunk.content:
                             if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
                                 payload = {"type": "content", "text": item.get("text")}
+                                assistant_content += item.get("text")
                                 yield f"data: {json.dumps(payload)}\n\n"
 
-        # İşlem sorunsuz bittiğinde frontend'e sinyal gönderiyoruz
+        # Asistan yanıtını DB'ye kaydet
+        assistant_msg = ChatMessage(
+            session_id=session_id, 
+            role="assistant", 
+            content=assistant_content,
+            ui_state=ui_state
+        )
+        db.add(assistant_msg)
+        
+        # Session updated_at'i güncelle
+        session = await db.execute(select(ChatSession).where(ChatSession.id == session_id))
+        sess_obj = session.scalar_one_or_none()
+        if sess_obj:
+            # If first message, update title
+            if sess_obj.title == "Yeni Sohbet":
+                sess_obj.title = message[:30] + "..." if len(message) > 30 else message
+        
+        await db.commit()
+
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         
+    except asyncio.CancelledError:
+        # İptal durumunda o ana kadarki cevabı kaydet
+        assistant_msg = ChatMessage(session_id=session_id, role="assistant", content=assistant_content, ui_state=ui_state)
+        db.add(assistant_msg)
+        await db.commit()
+        raise
     except Exception as e:
-        # Hata anında frontend'e hata mesajı gönderiyoruz
         error_payload = {"type": "error", "text": str(e)}
         yield f"data: {json.dumps(error_payload)}\n\n"
 
 @app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest, db = Depends(get_db)):
     """
     Arayüzden gelen POST isteklerini karşılar ve StreamingResponse ile Server-Sent Events (SSE) yayınını başlatır.
     """
     return StreamingResponse(
-        generate_chat_events(request.message, request.session_id),
+        generate_chat_events(request.message, request.session_id, db),
         media_type="text/event-stream"
     )
 
 @app.get("/api/health")
 async def health_check():
     return {"status": "TradeSwarm Backend is running perfectly!"}
+
+@app.get("/api/sessions")
+async def get_sessions(db = Depends(get_db)):
+    result = await db.execute(select(ChatSession).order_by(ChatSession.updated_at.desc()))
+    return result.scalars().all()
+
+@app.post("/api/sessions")
+async def create_session(session_data: SessionCreate, db = Depends(get_db)):
+    new_sess = ChatSession(title=session_data.title)
+    db.add(new_sess)
+    await db.commit()
+    await db.refresh(new_sess)
+    return new_sess
+
+@app.get("/api/sessions/{session_id}/messages")
+async def get_messages(session_id: str, db = Depends(get_db)):
+    result = await db.execute(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.asc())
+    )
+    return result.scalars().all()
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str, db = Depends(get_db)):
+    session = await db.execute(select(ChatSession).where(ChatSession.id == session_id))
+    sess_obj = session.scalar_one_or_none()
+    if sess_obj:
+        await db.delete(sess_obj)
+        await db.commit()
+    return {"status": "success"}
