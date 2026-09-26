@@ -8,7 +8,7 @@ import asyncio
 
 from backend.db import init_db, AsyncSessionLocal, ChatSession, ChatMessage
 from backend.models import ChatRequest, SessionCreate
-from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL
+from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, TITLE_GENERATOR_MODEL
 from agents.orchestrator.agent import create_orchestrator_agent
 from langchain.chat_models import init_chat_model
 
@@ -27,7 +27,7 @@ orchestrator = create_orchestrator_agent()
 async def generate_title_from_message(user_message: str, assistant_message: str) -> str:
     try:
         llm = init_chat_model(
-            model="meta-llama/llama-3.1-8b-instruct",
+            model=TITLE_GENERATOR_MODEL,
             model_provider="openai",
             api_key=OPENROUTER_API_KEY,
             base_url=OPENROUTER_BASE_URL,

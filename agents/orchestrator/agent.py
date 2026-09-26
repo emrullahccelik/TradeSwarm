@@ -1,71 +1,9 @@
-from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
-
-
-from langchain_openai import ChatOpenAI
+from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL
 from langchain.agents import create_agent
-from langchain.tools import tool
-
-from agents.trader.agent import create_trader_agent
-from agents.researcher.agent import create_researcher_agent
-from agents.market_analyzer.agent import create_market_analyzer_agent
-
-
-
-# Alt ajanları oluştur (Lazy-loading de yapılabilir ama basitlik için başlatıyoruz)
-trader_agent = create_trader_agent()
-researcher_agent = create_researcher_agent()
-market_analyzer_agent = create_market_analyzer_agent()
-
-@tool
-def ask_trader(query: str) -> str:
-    """Binance Spot piyasasında işlem yapmak, emir vermek, fiyat sorgulamak veya bakiye kontrol etmek için bu aracı kullan.
-    Sana gelen alım/satım taleplerini veya cüzdan sorularını doğrudan bu ajana ilet."""
-    try:
-        response = trader_agent.invoke({"messages": [{"role": "user", "content": query}]})
-        return response["messages"][-1].content
-    except Exception as e:
-        return f"Trader Agent Hatası: {str(e)}"
-
-@tool
-def ask_researcher(query: str) -> str:
-    """Genel kripto para haberleri, makroekonomik veriler, proje açıklamaları ve internet üzerindeki güncel gelişmeler için bu aracı kullan.
-    Tavily arama motoru ile web'i tarayarak detaylı araştırma yapar."""
-    try:
-        response = researcher_agent.invoke({"messages": [{"role": "user", "content": query}]})
-        return response["messages"][-1].content
-    except Exception as e:
-        return f"Researcher Agent Hatası: {str(e)}"
-
-@tool
-def ask_market_analyzer(query: str) -> str:
-    """Kripto piyasasındaki istatistiksel veriler (CoinGecko), borsa listelenmeleri, anlık detaylı fiyat bilgileri, şirketlerin kripto rezervleri ve trend olan coinler için bu aracı kullan.
-    Sayısal veri ve piyasa analizi istendiğinde buna başvur."""
-    try:
-        response = market_analyzer_agent.invoke({"messages": [{"role": "user", "content": query}]})
-        return response["messages"][-1].content
-    except Exception as e:
-        return f"Market Analyzer Agent Hatası: {str(e)}"
-
-from backend.db import AsyncSessionLocal, ChatSession
-from langchain_core.runnables.config import RunnableConfig
-
-@tool
-async def update_chat_title(new_title: str, config: RunnableConfig) -> str:
-    """Bu sohbetin başlığını (title) günceller. Kullanıcı sohbet konusunun tamamen değiştiğini belirtirse veya sohbet ismini değiştirmek isterse bu aracı kullan."""
-    session_id = config.get("configurable", {}).get("thread_id")
-    if not session_id:
-        return "Hata: session_id bulunamadı."
-    
-    async with AsyncSessionLocal() as db:
-        session = await db.get(ChatSession, session_id)
-        if session:
-            session.title = new_title
-            await db.commit()
-            return f"Sohbet başlığı başarıyla '{new_title}' olarak güncellendi."
-        return "Sohbet bulunamadı."
-
 from langgraph.checkpoint.memory import MemorySaver
 from langchain.chat_models import init_chat_model
+
+from agents.orchestrator.tools import ask_trader, ask_researcher, ask_market_analyzer, update_chat_title
 
 memory = MemorySaver()
 

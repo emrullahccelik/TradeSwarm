@@ -15,6 +15,7 @@ DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HO
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash")
+TITLE_GENERATOR_MODEL = os.getenv("TITLE_GENERATOR_MODEL", "meta-llama/llama-3.1-8b-instruct")
 
 # Binance
 BINANCE_SPOT_API_KEY = os.getenv("BINANCE_SPOT_API_KEY")

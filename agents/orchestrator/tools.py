@@ -1,0 +1,57 @@
+from langchain.tools import tool
+from backend.db import AsyncSessionLocal, ChatSession
+from langchain_core.runnables.config import RunnableConfig
+
+from agents.trader.agent import create_trader_agent
+from agents.researcher.agent import create_researcher_agent
+from agents.market_analyzer.agent import create_market_analyzer_agent
+
+# Alt ajanları oluştur
+trader_agent = create_trader_agent()
+researcher_agent = create_researcher_agent()
+market_analyzer_agent = create_market_analyzer_agent()
+
+@tool
+def ask_trader(query: str) -> str:
+    """Binance Spot piyasasında işlem yapmak, emir vermek, fiyat sorgulamak veya bakiye kontrol etmek için bu aracı kullan.
+    Sana gelen alım/satım taleplerini veya cüzdan sorularını doğrudan bu ajana ilet."""
+    try:
+        response = trader_agent.invoke({"messages": [{"role": "user", "content": query}]})
+        return response["messages"][-1].content
+    except Exception as e:
+        return f"Trader Agent Hatası: {str(e)}"
+
+@tool
+def ask_researcher(query: str) -> str:
+    """Genel kripto para haberleri, makroekonomik veriler, proje açıklamaları ve internet üzerindeki güncel gelişmeler için bu aracı kullan.
+    Tavily arama motoru ile web'i tarayarak detaylı araştırma yapar."""
+    try:
+        response = researcher_agent.invoke({"messages": [{"role": "user", "content": query}]})
+        return response["messages"][-1].content
+    except Exception as e:
+        return f"Researcher Agent Hatası: {str(e)}"
+
+@tool
+def ask_market_analyzer(query: str) -> str:
+    """Kripto piyasasındaki istatistiksel veriler (CoinGecko), borsa listelenmeleri, anlık detaylı fiyat bilgileri, şirketlerin kripto rezervleri ve trend olan coinler için bu aracı kullan.
+    Sayısal veri ve piyasa analizi istendiğinde buna başvur."""
+    try:
+        response = market_analyzer_agent.invoke({"messages": [{"role": "user", "content": query}]})
+        return response["messages"][-1].content
+    except Exception as e:
+        return f"Market Analyzer Agent Hatası: {str(e)}"
+
+@tool
+async def update_chat_title(new_title: str, config: RunnableConfig) -> str:
+    """Bu sohbetin başlığını (title) günceller. Kullanıcı sohbet konusunun tamamen değiştiğini belirtirse veya sohbet ismini değiştirmek isterse bu aracı kullan."""
+    session_id = config.get("configurable", {}).get("thread_id")
+    if not session_id:
+        return "Hata: session_id bulunamadı."
+    
+    async with AsyncSessionLocal() as db:
+        session = await db.get(ChatSession, session_id)
+        if session:
+            session.title = new_title
+            await db.commit()
+            return f"Sohbet başlığı başarıyla '{new_title}' olarak güncellendi."
+        return "Sohbet bulunamadı."
