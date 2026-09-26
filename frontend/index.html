@@ -125,6 +125,7 @@
         const sessionList = document.getElementById('session-list');
         const newChatBtn = document.getElementById('new-chat-btn');
         const headerTitle = document.getElementById('header-session-title');
+        newChatBtn.addEventListener('click', handleNewChatBtn);
 
         // ==========================================
         // SESSIONS MANAGEMENT
@@ -267,18 +268,19 @@
             iconDiv.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
             
             const contentContainer = document.createElement('div');
-            contentContainer.className = `flex flex-col gap-3 max-w-[80%] w-full ${role === 'user' ? 'items-end' : 'items-start'}`;
             contentContainer.id = `content-container-${id}`;
             
             if (role === 'user') {
+                contentContainer.className = `flex flex-col gap-3 max-w-[80%] w-full items-end`;
                 const messageBox = document.createElement('div');
                 messageBox.id = `message-${id}`;
                 messageBox.className = 'rounded-2xl px-5 py-3.5 prose prose-invert w-full bg-zinc-800 text-zinc-200 rounded-tr-sm';
                 contentContainer.appendChild(messageBox);
             } else {
+                contentContainer.className = `flex flex-col gap-4 max-w-[85%] w-full items-start bg-zinc-900 border border-zinc-800 rounded-2xl rounded-tl-sm px-5 py-4`;
                 const typing = document.createElement('div');
                 typing.id = `typing-${id}`;
-                typing.className = 'flex gap-1 items-center h-6 px-5 py-3.5 rounded-2xl bg-zinc-900 border border-zinc-800 w-fit rounded-tl-sm';
+                typing.className = 'flex gap-1 items-center h-6 w-fit';
                 typing.innerHTML = `
                     <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse"></span>
                     <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" style="animation-delay: 0.2s"></span>
@@ -317,7 +319,7 @@
                 let lastChild = container.lastElementChild;
                 if (!lastChild || !lastChild.classList.contains('prose-content')) {
                     lastChild = document.createElement('div');
-                    lastChild.className = 'rounded-2xl px-5 py-3.5 prose prose-invert w-full bg-zinc-900 border border-zinc-800 text-zinc-300 prose-content rounded-tl-sm shadow-sm';
+                    lastChild.className = 'prose prose-invert w-full text-zinc-300 prose-content';
                     lastChild.dataset.rawText = '';
                     container.appendChild(lastChild);
                 }
