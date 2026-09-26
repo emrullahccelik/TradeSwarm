@@ -62,7 +62,7 @@ async def generate_chat_events(message: str, session_id: str, db):
     # Asistanın yanıtını biriktirmek için state
     assistant_content = ""
     ui_state = []
-    current_sub_agent = None
+    active_sub_agents = set()
 
     try:
         # DB'den geçmiş mesajları çekerek ajana hafıza (memory) sağlıyoruz (Sunucu restart olsa bile hatırlaması için)
@@ -96,7 +96,7 @@ async def generate_chat_events(message: str, session_id: str, db):
                 run_id = event.get("run_id", "")
                 parent_ids = event.get("parent_ids", [])
                 if name in sub_agents:
-                    current_sub_agent = name
+                    active_sub_agents.add(run_id)
                     payload = {"type": "sub_agent_start", "tool": name, "run_id": run_id}
                     ui_state.append(payload)
                 else:
@@ -108,20 +108,21 @@ async def generate_chat_events(message: str, session_id: str, db):
                 run_id = event.get("run_id", "")
                 parent_ids = event.get("parent_ids", [])
                 if name in sub_agents:
+                    active_sub_agents.discard(run_id)
                     output = event["data"].get("output", "")
                     if hasattr(output, "content"):
                         output = output.content
                     payload = {"type": "sub_agent_end", "tool": name, "text": str(output), "run_id": run_id}
                     ui_state.append(payload)
-                    current_sub_agent = None
                 else:
                     payload = {"type": "tool_end", "tool": name, "run_id": run_id, "parent_ids": parent_ids}
                     ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
             elif kind == "on_chat_model_stream":
-                # Eğer bir alt ajan çalışıyorsa, onun içsel düşüncelerini/üretimini ana ekrana basma (Sızıntıyı önle)
-                if current_sub_agent:
+                # Eğer bu stream'in ebeveynlerinden biri aktif bir alt ajansa, sızmasını engelle!
+                parent_ids = event.get("parent_ids", [])
+                if any(pid in active_sub_agents for pid in parent_ids):
                     continue
                 
                 chunk = event["data"].get("chunk")
