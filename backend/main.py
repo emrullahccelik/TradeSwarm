@@ -8,7 +8,9 @@ import asyncio
 
 from backend.db import init_db, AsyncSessionLocal, ChatSession, ChatMessage
 from backend.models import ChatRequest, SessionCreate
+from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL
 from agents.orchestrator.agent import create_orchestrator_agent
+from langchain.chat_models import init_chat_model
 
 app = FastAPI(title="TradeSwarm AI Backend")
 
@@ -21,6 +23,22 @@ app.add_middleware(
 )
 
 orchestrator = create_orchestrator_agent()
+
+async def generate_title_from_message(user_message: str, assistant_message: str) -> str:
+    try:
+        llm = init_chat_model(
+            model="meta-llama/llama-3.1-8b-instruct",
+            model_provider="openai",
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            temperature=0.7
+        )
+        prompt = f"Kullanıcı mesajı ve Asistanın cevabına dayanarak bu sohbet için 3-5 kelimelik kısa, öz ve ilgi çekici bir başlık oluştur. Sadece başlığı yaz, tırnak işareti kullanma.\n\nKullanıcı: {user_message}\n\nAsistan: {assistant_message}"
+        response = await llm.ainvoke(prompt)
+        title = response.content.strip().replace('"', '')
+        return title
+    except Exception as e:
+        return user_message[:30] + "..." if len(user_message) > 30 else user_message
 
 @app.on_event("startup")
 async def on_startup():
@@ -151,7 +169,7 @@ async def generate_chat_events(message: str, session_id: str, db):
         if sess_obj:
             # If first message, update title
             if sess_obj.title == "Yeni Sohbet":
-                sess_obj.title = message[:30] + "..." if len(message) > 30 else message
+                sess_obj.title = await generate_title_from_message(message, assistant_content)
         
         await db.commit()
 

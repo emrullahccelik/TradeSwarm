@@ -46,6 +46,24 @@ def ask_market_analyzer(query: str) -> str:
     except Exception as e:
         return f"Market Analyzer Agent Hatası: {str(e)}"
 
+from backend.db import AsyncSessionLocal, ChatSession
+from langchain_core.runnables.config import RunnableConfig
+
+@tool
+async def update_chat_title(new_title: str, config: RunnableConfig) -> str:
+    """Bu sohbetin başlığını (title) günceller. Kullanıcı sohbet konusunun tamamen değiştiğini belirtirse veya sohbet ismini değiştirmek isterse bu aracı kullan."""
+    session_id = config.get("configurable", {}).get("thread_id")
+    if not session_id:
+        return "Hata: session_id bulunamadı."
+    
+    async with AsyncSessionLocal() as db:
+        session = await db.get(ChatSession, session_id)
+        if session:
+            session.title = new_title
+            await db.commit()
+            return f"Sohbet başlığı başarıyla '{new_title}' olarak güncellendi."
+        return "Sohbet bulunamadı."
+
 from langgraph.checkpoint.memory import MemorySaver
 from langchain.chat_models import init_chat_model
 
@@ -61,7 +79,7 @@ def create_orchestrator_agent():
         model_kwargs={"extra_body": {"include_reasoning": True}}
     )
 
-    tools = [ask_trader, ask_researcher, ask_market_analyzer]
+    tools = [ask_trader, ask_researcher, ask_market_analyzer, update_chat_title]
 
     system_prompt = (
         "Sen bu sistemin Yöneticisi ve Ana Ajanısın (Orchestrator Agent). Sistemin adı: TradeSwarm.\n"
