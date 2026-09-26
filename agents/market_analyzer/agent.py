@@ -1,5 +1,6 @@
-import os
-from dotenv import load_dotenv
+from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
+
+
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from agents.market_analyzer.tools import (
@@ -13,13 +14,13 @@ from agents.market_analyzer.tools import (
     get_public_treasury
 )
 
-load_dotenv()
+
 
 def create_market_analyzer_agent():
     llm = ChatOpenAI(
-        model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        model=OPENROUTER_MODEL,
+        api_key=OPENROUTER_API_KEY,
+        base_url=OPENROUTER_BASE_URL,
         temperature=0.1
     )
 

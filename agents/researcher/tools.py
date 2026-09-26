@@ -1,9 +1,10 @@
-import os
+from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
+
 from langchain.tools import tool
 from tavily import TavilyClient
 
 def get_tavily_client():
-    return TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+    return TavilyClient(api_key=TAVILY_API_KEY)
 
 @tool
 def search_market_news(query: str) -> str:

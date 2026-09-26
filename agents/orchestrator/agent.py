@@ -1,5 +1,6 @@
-import os
-from dotenv import load_dotenv
+from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
+
+
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain.tools import tool
@@ -8,7 +9,7 @@ from agents.trader.agent import create_trader_agent
 from agents.researcher.agent import create_researcher_agent
 from agents.market_analyzer.agent import create_market_analyzer_agent
 
-load_dotenv()
+
 
 # Alt ajanları oluştur (Lazy-loading de yapılabilir ama basitlik için başlatıyoruz)
 trader_agent = create_trader_agent()
@@ -52,10 +53,10 @@ memory = MemorySaver()
 
 def create_orchestrator_agent():
     llm = init_chat_model(
-        model=os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash"),
+        model=OPENROUTER_MODEL,
         model_provider="openai",
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        api_key=OPENROUTER_API_KEY,
+        base_url=OPENROUTER_BASE_URL,
         temperature=0.2,
         model_kwargs={"extra_body": {"include_reasoning": True}}
     )

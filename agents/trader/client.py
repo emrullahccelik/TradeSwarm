@@ -1,9 +1,10 @@
-import os
+from backend.config import OPENROUTER_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
+
 import time
-from dotenv import load_dotenv
+
 from binance.client import Client
 
-load_dotenv()
+
 
 _client_instance = None
 
@@ -12,8 +13,8 @@ def get_binance_client() -> Client:
     if _client_instance is not None:
         return _client_instance
         
-    api_key = os.getenv("BINANCE_SPOT_API_KEY")
-    secret_key = os.getenv("BINANCE_SPOT_SECRET_KEY")
+    api_key = BINANCE_SPOT_API_KEY
+    secret_key = BINANCE_SPOT_SECRET_KEY
     
     # Testnet üzerinden çalışıyoruz
     client = Client(api_key, secret_key, testnet=True)
