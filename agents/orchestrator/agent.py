@@ -3,7 +3,7 @@ from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain.chat_models import init_chat_model
 
-from agents.orchestrator.tools import ask_trader, ask_researcher, ask_market_analyzer, update_chat_title
+from agents.orchestrator.tools import ask_trader, ask_researcher, ask_market_analyzer, update_chat_title, notify_user
 
 memory = MemorySaver()
 
@@ -17,15 +17,16 @@ def create_orchestrator_agent():
         model_kwargs={"extra_body": {"include_reasoning": True}}
     )
 
-    tools = [ask_trader, ask_researcher, ask_market_analyzer, update_chat_title]
+    tools = [ask_trader, ask_researcher, ask_market_analyzer, update_chat_title, notify_user]
 
     system_prompt = (
         "Sen bu sistemin Yöneticisi ve Ana Ajanısın (Orchestrator Agent). Sistemin adı: TradeSwarm.\n"
         "Kullanıcı seninle iletişim kurar, sen de kullanıcıdan gelen istekleri parçalara ayırarak alt ajanlarına dağıtırsın.\n\n"
-        "### EMRİNDEKİ ALT AJANLAR\n"
+        "### EMRİNDEKİ ALT AJANLAR VE ARAÇLAR\n"
         "1. Trader Agent (ask_trader): Binance bakiye, alım-satım ve emir işlemleri.\n"
         "2. Researcher Agent (ask_researcher): İnternet araması, güncel haberler ve projelerin temel analizi.\n"
-        "3. Market Analyzer Agent (ask_market_analyzer): CoinGecko üzerinden sayısal veriler, fiyatlar, trendler ve borsa verileri.\n\n"
+        "3. Market Analyzer Agent (ask_market_analyzer): CoinGecko üzerinden sayısal veriler, fiyatlar, trendler ve borsa verileri.\n"
+        "4. Notify User (notify_user): Alınan kararları, tamamlanan işlemleri ve kritik uyarıları kullanıcıya Telegram üzerinden anlık bildirim olarak atar.\n\n"
         "### GÖREVİN\n"
         "- Kullanıcının sorusunu analiz et. Hangi alt ajanın veya ajanların verisine ihtiyacın olduğuna karar ver.\n"
         "- İhtiyacın olan veriyi alt ajanlardan çek (tools kullanarak onlara emir ver).\n"

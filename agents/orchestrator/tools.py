@@ -55,3 +55,31 @@ async def update_chat_title(new_title: str, config: RunnableConfig) -> str:
             await db.commit()
             return f"Sohbet başlığı başarıyla '{new_title}' olarak güncellendi."
         return "Sohbet bulunamadı."
+
+import aiohttp
+from backend.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+@tool
+async def notify_user(message: str) -> str:
+    """Yaptığın kritik analizleri, piyasa kararlarını veya gerçekleştirdiğin işlemleri (alım/satım vb.) kullanıcıya anında Telegram üzerinden bildirim olarak göndermek için bu aracı kullan. 
+    Kullanıcıya sürecin kısa bir özetini sun."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return "Telegram bildirim ayarları (.env) eksik. Lütfen Telegram Bot Token ve Chat ID'yi yapılandırın."
+    
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                if response.status == 200:
+                    return "Telegram bildirimi başarıyla gönderildi."
+                else:
+                    err_text = await response.text()
+                    return f"Telegram bildirim hatası: {response.status} - {err_text}"
+    except Exception as e:
+        return f"Telegram'a gönderilirken bir hata oluştu: {str(e)}"
