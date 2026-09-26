@@ -16,7 +16,6 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         
         # Inject the API Key from the environment variable!
-        proxy_set_header X-API-Key "${API_AUTH_KEY}";
         
         # SSE Support (Stream)
         proxy_http_version 1.1;

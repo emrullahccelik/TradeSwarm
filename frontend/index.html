@@ -43,6 +43,23 @@
     </style>
 </head>
 <body class="flex h-screen font-sans overflow-hidden">
+    <!-- JWT Login Overlay -->
+    <div id="login-overlay" class="fixed inset-0 bg-zinc-950 z-50 hidden flex-col items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-sm flex flex-col items-center text-center">
+            <div class="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-robot text-3xl text-white"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-zinc-100 mb-2">TradeSwarm AI</h2>
+            <p class="text-zinc-400 mb-8 text-sm">Devam etmek için yönetici şifrenizi girin.</p>
+            
+            <input type="password" id="login-input" placeholder="Şifreniz" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-200 outline-none focus:border-indigo-500 transition-colors mb-4 text-center">
+            <button id="login-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl py-3 transition-colors flex items-center justify-center gap-2">
+                Giriş Yap
+            </button>
+            <p id="login-error" class="text-red-400 text-sm mt-4 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Hatalı şifre, lütfen tekrar deneyin.</p>
+        </div>
+    </div>
+
 
     <!-- Sidebar -->
     <aside class="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col flex-shrink-0 transition-all duration-300">
@@ -111,14 +128,73 @@
     <script>
                 const API_BASE = '/api';
         
-        // --- AUTH LOGIC ---
-        // Nginx Reverse Proxy injects X-API-Key securely.
+
+        // --- JWT AUTH LOGIC ---
+        let jwtToken = localStorage.getItem('tradeswarm_jwt');
+        
+        const loginOverlay = document.getElementById('login-overlay');
+        const loginInput = document.getElementById('login-input');
+        const loginBtn = document.getElementById('login-btn');
+        const loginError = document.getElementById('login-error');
+
         const getHeaders = () => {
             return {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${jwtToken}`
             };
         };
-        // ------------------
+
+        const showLogin = () => {
+            loginOverlay.style.display = 'flex';
+        };
+
+        const hideLogin = () => {
+            loginOverlay.style.display = 'none';
+        };
+
+        const handleLogin = async () => {
+            const password = loginInput.value;
+            if (!password) return;
+            loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                const res = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ password })
+                });
+                if (!res.ok) throw new Error("Şifre Yanlış");
+                const data = await res.json();
+                jwtToken = data.access_token;
+                localStorage.setItem('tradeswarm_jwt', jwtToken);
+                hideLogin();
+                loadSessions(); // Reload sessions after login
+            } catch (e) {
+                loginError.style.display = 'block';
+            } finally {
+                loginBtn.innerHTML = 'Giriş Yap';
+            }
+        };
+
+        loginBtn.addEventListener('click', handleLogin);
+        loginInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+
+        // Intercept fetch responses to catch 401s
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            if (response.status === 401) {
+                showLogin();
+            }
+            return response;
+        };
+
+        if (!jwtToken) {
+            showLogin();
+        }
+        // ----------------------
+
 
         let currentSessionId = null;
         let isGenerating = false;
