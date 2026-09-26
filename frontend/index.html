@@ -109,7 +109,17 @@
     </main>
 
     <script>
-        const API_BASE = 'http://localhost:8000/api';
+                const API_BASE = '/api';
+        
+        // --- AUTH LOGIC ---
+        // Nginx Reverse Proxy injects X-API-Key securely.
+        const getHeaders = () => {
+            return {
+                'Content-Type': 'application/json'
+            };
+        };
+        // ------------------
+
         let currentSessionId = null;
         let isGenerating = false;
         let abortController = null;
@@ -132,7 +142,7 @@
         // ==========================================
         async function loadSessions() {
             try {
-                const res = await fetch(`${API_BASE}/sessions`);
+                const res = await fetch(`${API_BASE}/sessions`, { headers: getHeaders() });
                 const sessions = await res.json();
                 sessionList.innerHTML = '';
                 
@@ -173,7 +183,7 @@
             if (!confirm('Bu sohbeti tamamen silmek istediğinize emin misiniz?')) return;
             
             try {
-                await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' });
+                await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE', headers: getHeaders() });
                 if (id === currentSessionId) {
                     handleNewChatBtn();
                 }
@@ -187,7 +197,7 @@
             try {
                 const res = await fetch(`${API_BASE}/sessions`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders(),
                     body: JSON.stringify({ title: "Yeni Sohbet" })
                 });
                 return await res.json();
@@ -221,7 +231,7 @@
 
             // Fetch messages for this session
             try {
-                const res = await fetch(`${API_BASE}/sessions/${id}/messages`);
+                const res = await fetch(`${API_BASE}/sessions/${id}/messages`, { headers: getHeaders() });
                 const messages = await res.json();
                 
                 if (messages.length === 0) {
@@ -426,7 +436,7 @@
             try {
                 const response = await fetch(`${API_BASE}/chat`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders(),
                     body: JSON.stringify({ message: message, session_id: currentSessionId }),
                     signal: abortController.signal
                 });

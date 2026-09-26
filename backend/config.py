@@ -37,3 +37,6 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 # Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+# Security
+API_AUTH_KEY = os.getenv('API_AUTH_KEY')

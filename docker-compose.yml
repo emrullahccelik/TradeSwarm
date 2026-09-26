@@ -22,8 +22,6 @@ services:
       - .env
     environment:
       - DB_HOST=db
-    ports:
-      - "8000:8000"
     volumes:
       - .:/app
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
@@ -36,10 +34,13 @@ services:
       dockerfile: Dockerfile
     container_name: tradeswarm-frontend
     restart: always
+    env_file:
+      - .env
     ports:
       - "3000:80"
     volumes:
       - ./frontend/index.html:/usr/share/nginx/html/index.html
+      - ./frontend/default.conf.template:/etc/nginx/templates/default.conf.template
 
 volumes:
   pgdata:
