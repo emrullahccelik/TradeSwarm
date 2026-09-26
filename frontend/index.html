@@ -113,7 +113,7 @@
         let currentSessionId = null;
         let isGenerating = false;
         let abortController = null;
-        let activeSubAgent = null;
+        let activeSubAgents = {};
 
         // UI Elements
         const chatForm = document.getElementById('chat-form');
@@ -314,7 +314,7 @@
             } 
             else if (type === 'sub_agent_start') {
                 const runId = data.run_id || toolName;
-                activeSubAgent = runId;
+                activeSubAgents[runId] = toolName;
                 const agentNames = { 'ask_trader': 'Trader Ajanı', 'ask_researcher': 'Araştırmacı Ajan', 'ask_market_analyzer': 'Piyasa Analisti' };
                 const displayName = agentNames[toolName] || toolName;
 
@@ -338,15 +338,25 @@
                 if (contentDiv) {
                     contentDiv.innerHTML = marked.parse(text);
                 }
-                if (activeSubAgent === runId) activeSubAgent = null;
+                delete activeSubAgents[runId];
             }
             else if (type === 'tool_start') {
                 const runId = data.run_id || toolName; // fallback to toolName if run_id is missing
-                let targetContainer = activeSubAgent 
-                    ? document.getElementById(`sub-agent-tools-${id}-${activeSubAgent}`)
-                    : document.getElementById(`tools-${id}`);
+                let targetContainer = null;
+                if (data.parent_ids && Array.isArray(data.parent_ids)) {
+                    for (let pid of data.parent_ids) {
+                        if (activeSubAgents[pid]) {
+                            targetContainer = document.getElementById(`sub-agent-tools-${id}-${pid}`);
+                            break;
+                        }
+                    }
+                }
                 
-                if (!targetContainer && !activeSubAgent) {
+                if (!targetContainer) {
+                    targetContainer = document.getElementById(`tools-${id}`);
+                }
+                
+                if (!targetContainer) {
                     targetContainer = document.createElement('div');
                     targetContainer.id = `tools-${id}`;
                     targetContainer.className = 'flex flex-col gap-1 mb-2 w-full';

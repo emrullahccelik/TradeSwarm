@@ -94,17 +94,19 @@ async def generate_chat_events(message: str, session_id: str, db):
             
             if kind == "on_tool_start":
                 run_id = event.get("run_id", "")
+                parent_ids = event.get("parent_ids", [])
                 if name in sub_agents:
                     current_sub_agent = name
                     payload = {"type": "sub_agent_start", "tool": name, "run_id": run_id}
                     ui_state.append(payload)
                 else:
-                    payload = {"type": "tool_start", "tool": name, "run_id": run_id}
+                    payload = {"type": "tool_start", "tool": name, "run_id": run_id, "parent_ids": parent_ids}
                     ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
             elif kind == "on_tool_end":
                 run_id = event.get("run_id", "")
+                parent_ids = event.get("parent_ids", [])
                 if name in sub_agents:
                     output = event["data"].get("output", "")
                     if hasattr(output, "content"):
@@ -113,7 +115,7 @@ async def generate_chat_events(message: str, session_id: str, db):
                     ui_state.append(payload)
                     current_sub_agent = None
                 else:
-                    payload = {"type": "tool_end", "tool": name, "run_id": run_id}
+                    payload = {"type": "tool_end", "tool": name, "run_id": run_id, "parent_ids": parent_ids}
                     ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
