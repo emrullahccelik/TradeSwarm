@@ -113,7 +113,7 @@
         let currentSessionId = null;
         let isGenerating = false;
         let abortController = null;
-        let if (activeSubAgent === runId) activeSubAgent = null;
+        let activeSubAgent = null;
 
         // UI Elements
         const chatForm = document.getElementById('chat-form');
@@ -236,7 +236,7 @@
                         // If it has UI state (tool calls, reasoning), render them
                         if (msg.ui_state && msg.ui_state.length > 0) {
                             msg.ui_state.forEach(state => {
-                                updateMessage(elId, state.text || '', state.type, state.tool);
+                                updateMessage(elId, state.text || '', state.type, state.tool, state);
                             });
                         }
                         // Render final content
@@ -299,7 +299,7 @@
             return id;
         }
 
-        function updateMessage(id, text, type, toolName) {
+        function updateMessage(id, text, type, toolName, data = {}) {
             const container = document.getElementById(`content-container-${id}`);
             const messageBox = document.getElementById(`message-${id}`);
             const typingIndicator = document.getElementById(`typing-${id}`);
@@ -468,7 +468,7 @@
                                         // Update sidebar names
                                         loadSessions();
                                     } else {
-                                        updateMessage(msgId, data.text || '', data.type, data.tool);
+                                        updateMessage(msgId, data.text || '', data.type, data.tool, data);
                                     }
                                 } catch (e) {
                                     console.error('Error parsing JSON:', e, jsonStr);
