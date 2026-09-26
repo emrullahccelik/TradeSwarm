@@ -106,13 +106,42 @@
                     class="flex-1 bg-transparent border-none text-zinc-200 placeholder-zinc-500 px-4 py-2 focus:outline-none"
                     autocomplete="off"
                 />
+
+                <!-- Ses Kaydediliyor Animasyonu -->
+                <div id="recording-indicator" class="hidden flex-1 items-center px-4 gap-3 text-red-500">
+                    <span class="relative flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                    <span class="text-sm font-medium animate-pulse">Dinleniyor... (Kalan: <span id="recording-timer">60</span>s)</span>
+                </div>
+
                 <button
                     type="button"
                     id="stop-button"
                     class="hidden p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600/40 transition-colors"
-                    title="Durdur"
+                    title="İptal Et"
                 >
                     <i class="fa-solid fa-stop"></i>
+                </button>
+
+                <!-- Ses Kaydını Durdurma Butonu -->
+                <button
+                    type="button"
+                    id="stop-recording-button"
+                    class="hidden p-3 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-colors shrink-0"
+                    title="Kaydı Bitir"
+                >
+                    <i class="fa-solid fa-square"></i>
+                </button>
+
+                <button
+                    type="button"
+                    id="mic-button"
+                    class="p-3 bg-zinc-800 text-zinc-400 rounded-xl hover:bg-zinc-700 hover:text-white transition-colors shrink-0"
+                    title="Sesli Komut"
+                >
+                    <i class="fa-solid fa-microphone"></i>
                 </button>
                 <button
                     type="submit"
@@ -570,6 +599,132 @@
                 stopButton.style.display = 'none';
                 isGenerating = false;
                 messageInput.focus();
+            }
+        });
+
+        // ==========================================
+        // SPEECH TO TEXT (STT) LOGIC
+        // ==========================================
+        const micButton = document.getElementById('mic-button');
+        const stopRecordingBtn = document.getElementById('stop-recording-button');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordTimeout = null;
+        let recordInterval = null;
+
+        const endRecording = () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        };
+
+        stopRecordingBtn.addEventListener('click', endRecording);
+
+        micButton.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.addEventListener("dataavailable", event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", async () => {
+                    isRecording = false;
+                    clearInterval(recordInterval);
+                    clearTimeout(recordTimeout);
+
+                    // Arayüzü STT'ye gönderiliyor moduna al
+                    recordingIndicator.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Dinlenen ses yazıya çevriliyor...';
+                    stopRecordingBtn.style.display = 'none';
+                    stopRecordingBtn.classList.add('hidden');
+
+                    // Mikrofonu kapat
+                    stream.getTracks().forEach(track => track.stop());
+
+                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    
+                    reader.onloadend = async () => {
+                        let base64data = reader.result.split(',')[1];
+                        let format = "webm";
+                        if (mediaRecorder.mimeType.includes("mp4")) format = "mp4";
+                        else if (mediaRecorder.mimeType.includes("ogg")) format = "ogg";
+                        else if (mediaRecorder.mimeType.includes("wav")) format = "wav";
+
+                        try {
+                            const res = await fetch(`${API_BASE}/stt`, {
+                                method: 'POST',
+                                headers: getHeaders(),
+                                body: JSON.stringify({ audio_base64: base64data, format: format })
+                            });
+                            
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (data.text) {
+                                    messageInput.value = (messageInput.value + " " + data.text).trim();
+                                }
+                            } else {
+                                console.error("STT API Error:", await res.text());
+                                alert("Ses tanıma başarısız oldu.");
+                            }
+                        } catch (err) {
+                            console.error("STT Error:", err);
+                        } finally {
+                            // Orijinal arayüze dön
+                            recordingIndicator.classList.add('hidden');
+                            recordingIndicator.style.display = 'none';
+                            recordingIndicator.innerHTML = `
+                                <span class="relative flex h-3 w-3">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                                <span class="text-sm font-medium animate-pulse">Dinleniyor... (Kalan: <span id="recording-timer">60</span>s)</span>
+                            `;
+                            messageInput.classList.remove('hidden');
+                            micButton.style.display = 'block';
+                            sendButton.style.display = 'block';
+                            messageInput.focus();
+                        }
+                    };
+                });
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // Arayüzü kayıt moduna al
+                messageInput.classList.add('hidden');
+                micButton.style.display = 'none';
+                sendButton.style.display = 'none';
+                
+                recordingIndicator.classList.remove('hidden');
+                recordingIndicator.style.display = 'flex';
+                
+                stopRecordingBtn.classList.remove('hidden');
+                stopRecordingBtn.style.display = 'block';
+
+                // 60 saniyelik sayaç
+                let timeLeft = 60;
+                const timerSpan = document.getElementById('recording-timer');
+                if(timerSpan) timerSpan.textContent = timeLeft;
+                
+                recordInterval = setInterval(() => {
+                    timeLeft--;
+                    const t = document.getElementById('recording-timer');
+                    if (t) t.textContent = timeLeft;
+                }, 1000);
+
+                recordTimeout = setTimeout(() => {
+                    endRecording();
+                }, 60000);
+
+            } catch (err) {
+                console.error("Microphone access denied:", err);
+                alert("Mikrofon erişimine izin vermeniz gerekiyor.");
             }
         });
 

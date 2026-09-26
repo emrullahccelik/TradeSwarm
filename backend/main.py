@@ -14,7 +14,7 @@ import asyncio
 
 from backend.db import init_db, AsyncSessionLocal, ChatSession, ChatMessage
 from backend.models import ChatRequest, SessionCreate
-from backend.config import TITLE_MODEL, TITLE_API_KEY, TITLE_BASE_URL
+from backend.config import TITLE_MODEL, TITLE_API_KEY, TITLE_BASE_URL, STT_MODEL, STT_API_KEY, STT_BASE_URL
 from agents.orchestrator.agent import create_orchestrator_agent
 from langchain.chat_models import init_chat_model
 
@@ -279,3 +279,37 @@ async def delete_session(session_id: str, db = Depends(get_db)):
         await db.delete(sess_obj)
         await db.commit()
     return {"status": "success"}
+
+class STTRequest(BaseModel):
+    audio_base64: str
+    format: str = "webm"
+
+import aiohttp
+
+@app.post("/api/stt")
+async def process_stt(req: STTRequest):
+    if not STT_API_KEY:
+        raise HTTPException(status_code=500, detail="STT_API_KEY eksik")
+        
+    async with aiohttp.ClientSession() as session:
+        payload = {
+            "model": STT_MODEL,
+            "input_audio": {
+                "data": req.audio_base64,
+                "format": req.format
+            }
+        }
+        headers = {
+            "Authorization": f"Bearer {STT_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        # URL'nin sonuna /audio/transcriptions ekliyoruz (Eğer BASE_URL'de yoksa)
+        url = STT_BASE_URL if STT_BASE_URL.endswith("/audio/transcriptions") else STT_BASE_URL + "/audio/transcriptions"
+        
+        async with session.post(url, json=payload, headers=headers) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                return {"text": data.get("text", "")}
+            else:
+                err = await resp.text()
+                raise HTTPException(status_code=resp.status, detail=f"OpenRouter Error: {err}")

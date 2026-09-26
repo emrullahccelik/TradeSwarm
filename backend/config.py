@@ -40,3 +40,8 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # Security
 API_AUTH_KEY = os.getenv('API_AUTH_KEY')
+
+# STT (Speech-to-Text) CONFIG
+STT_BASE_URL = os.getenv("STT_BASE_URL", "https://openrouter.ai/api/v1")
+STT_API_KEY = os.getenv("STT_API_KEY")
+STT_MODEL = os.getenv("STT_MODEL", "openai/whisper-1")
