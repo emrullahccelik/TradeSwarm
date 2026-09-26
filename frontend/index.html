@@ -267,28 +267,26 @@
             iconDiv.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
             
             const contentContainer = document.createElement('div');
-            contentContainer.className = `flex flex-col gap-2 max-w-[80%] w-full ${role === 'user' ? 'items-end' : 'items-start'}`;
+            contentContainer.className = `flex flex-col gap-3 max-w-[80%] w-full ${role === 'user' ? 'items-end' : 'items-start'}`;
             contentContainer.id = `content-container-${id}`;
             
-            const messageBox = document.createElement('div');
-            messageBox.id = `message-${id}`;
-            messageBox.className = `rounded-2xl px-5 py-3.5 prose prose-invert w-full ${
-                role === 'user' 
-                    ? 'bg-zinc-800 text-zinc-200 rounded-tr-sm' 
-                    : 'bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-tl-sm'
-            }`;
-            
-            if (role === 'assistant') {
-                messageBox.innerHTML = `
-                    <div class="flex gap-1 items-center h-6" id="typing-${id}">
-                        <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse"></span>
-                        <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" style="animation-delay: 0.2s"></span>
-                        <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" style="animation-delay: 0.4s"></span>
-                    </div>
+            if (role === 'user') {
+                const messageBox = document.createElement('div');
+                messageBox.id = `message-${id}`;
+                messageBox.className = 'rounded-2xl px-5 py-3.5 prose prose-invert w-full bg-zinc-800 text-zinc-200 rounded-tr-sm';
+                contentContainer.appendChild(messageBox);
+            } else {
+                const typing = document.createElement('div');
+                typing.id = `typing-${id}`;
+                typing.className = 'flex gap-1 items-center h-6 px-5 py-3.5 rounded-2xl bg-zinc-900 border border-zinc-800 w-fit rounded-tl-sm';
+                typing.innerHTML = `
+                    <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse"></span>
+                    <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" style="animation-delay: 0.2s"></span>
+                    <span class="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" style="animation-delay: 0.4s"></span>
                 `;
+                contentContainer.appendChild(typing);
             }
 
-            contentContainer.appendChild(messageBox);
             div.appendChild(iconDiv);
             div.appendChild(contentContainer);
             chatContainer.appendChild(div);
@@ -301,18 +299,34 @@
 
         function updateMessage(id, text, type, toolName, data = {}) {
             const container = document.getElementById(`content-container-${id}`);
-            const messageBox = document.getElementById(`message-${id}`);
             const typingIndicator = document.getElementById(`typing-${id}`);
             
-            if (!container || !messageBox) return;
+            if (!container) return;
 
             if (type === 'content') {
                 if (typingIndicator) typingIndicator.remove();
-                if (!messageBox.dataset.rawText) messageBox.dataset.rawText = '';
-                messageBox.dataset.rawText += text;
-                messageBox.innerHTML = marked.parse(messageBox.dataset.rawText);
+                
+                const userBox = document.getElementById(`message-${id}`);
+                if (userBox) {
+                    if (!userBox.dataset.rawText) userBox.dataset.rawText = '';
+                    userBox.dataset.rawText += text;
+                    userBox.innerHTML = marked.parse(userBox.dataset.rawText);
+                    return;
+                }
+
+                let lastChild = container.lastElementChild;
+                if (!lastChild || !lastChild.classList.contains('prose-content')) {
+                    lastChild = document.createElement('div');
+                    lastChild.className = 'rounded-2xl px-5 py-3.5 prose prose-invert w-full bg-zinc-900 border border-zinc-800 text-zinc-300 prose-content rounded-tl-sm shadow-sm';
+                    lastChild.dataset.rawText = '';
+                    container.appendChild(lastChild);
+                }
+                
+                lastChild.dataset.rawText += text;
+                lastChild.innerHTML = marked.parse(lastChild.dataset.rawText);
             } 
             else if (type === 'sub_agent_start') {
+                if (typingIndicator) typingIndicator.remove();
                 const runId = data.run_id || toolName;
                 activeSubAgents[runId] = toolName;
                 const agentNames = { 'ask_trader': 'Trader Ajanı', 'ask_researcher': 'Araştırmacı Ajan', 'ask_market_analyzer': 'Piyasa Analisti' };
@@ -320,17 +334,17 @@
 
                 const subBox = document.createElement('div');
                 subBox.id = `sub-agent-${id}-${runId}`;
-                subBox.className = 'w-full bg-zinc-950 border-2 border-indigo-500/30 rounded-xl p-4 mb-3 shadow-lg';
+                subBox.className = 'w-full bg-zinc-950 border-2 border-indigo-500/30 rounded-xl p-4 shadow-lg flex flex-col';
                 subBox.innerHTML = `
                     <div class="flex items-center gap-2 mb-3 text-indigo-400 font-bold uppercase tracking-wider text-sm">
                         <i class="fa-solid fa-user-tie"></i> Alt Ajan Devrede: ${displayName}
                     </div>
-                    <div id="sub-agent-tools-${id}-${runId}" class="flex flex-col gap-2 mb-2 w-full"></div>
-                    <div id="sub-agent-content-${id}-${runId}" class="text-zinc-300 prose prose-invert w-full text-sm mt-3">
+                    <div id="sub-agent-tools-${id}-${runId}" class="flex flex-col gap-2 mb-2 w-full empty:hidden"></div>
+                    <div id="sub-agent-content-${id}-${runId}" class="text-zinc-300 prose prose-invert w-full text-sm mt-3 border-t border-zinc-800 pt-3">
                         <i class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i> Analiz ediliyor...
                     </div>
                 `;
-                container.insertBefore(subBox, messageBox);
+                container.appendChild(subBox);
             }
             else if (type === 'sub_agent_end') {
                 const runId = data.run_id || toolName;
@@ -341,8 +355,10 @@
                 delete activeSubAgents[runId];
             }
             else if (type === 'tool_start') {
-                const runId = data.run_id || toolName; // fallback to toolName if run_id is missing
+                if (typingIndicator) typingIndicator.remove();
+                const runId = data.run_id || toolName;
                 let targetContainer = null;
+                
                 if (data.parent_ids && Array.isArray(data.parent_ids)) {
                     for (let pid of data.parent_ids) {
                         if (activeSubAgents[pid]) {
@@ -352,62 +368,26 @@
                     }
                 }
                 
-                if (!targetContainer) {
-                    targetContainer = document.getElementById(`tools-${id}`);
-                }
-                
-                if (!targetContainer) {
-                    targetContainer = document.createElement('div');
-                    targetContainer.id = `tools-${id}`;
-                    targetContainer.className = 'flex flex-col gap-1 mb-2 w-full';
-                    container.insertBefore(targetContainer, messageBox);
-                }
-                
                 const toolBadge = document.createElement('div');
                 toolBadge.id = `tool-${id}-${runId}`;
-                toolBadge.className = 'text-xs text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-md px-2 py-1 w-fit flex items-center gap-2';
+                toolBadge.className = 'text-xs text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-md px-2 py-1.5 w-fit flex items-center gap-2 font-medium';
                 toolBadge.innerHTML = `<i class="fa-solid fa-gear fa-spin"></i> <span>Araç çalışıyor: <b>${toolName}</b>...</span>`;
-                if (targetContainer) targetContainer.appendChild(toolBadge);
+                
+                if (targetContainer) {
+                    targetContainer.appendChild(toolBadge);
+                } else {
+                    container.appendChild(toolBadge);
+                }
             }
             else if (type === 'tool_end') {
                 const runId = data.run_id || toolName;
                 const toolBadge = document.getElementById(`tool-${id}-${runId}`);
                 if (toolBadge) {
-                    toolBadge.className = 'text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2 py-1 w-fit flex items-center gap-2 transition-all';
+                    toolBadge.className = 'text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2 py-1.5 w-fit flex items-center gap-2 font-medium transition-all';
                     toolBadge.innerHTML = `<i class="fa-solid fa-check"></i> <span>Görev bitti: <b>${toolName}</b></span>`;
                 }
             }
-            else if (type === 'reasoning') {
-                if (typingIndicator) typingIndicator.remove();
-                let reasoningBox = document.getElementById(`reasoning-${id}`);
-                if (!reasoningBox) {
-                    reasoningBox = document.createElement('div');
-                    reasoningBox.id = `reasoning-${id}`;
-                    reasoningBox.className = 'thinking-block';
-                    reasoningBox.innerHTML = '<div class="flex items-center gap-2 mb-2 text-zinc-500 font-bold uppercase tracking-wider text-xs"><i class="fa-solid fa-bolt"></i> Thinking Process</div><div id="reasoning-content-' + id + '"></div>';
-                    container.insertBefore(reasoningBox, messageBox);
-                }
-                const contentDiv = document.getElementById(`reasoning-content-${id}`);
-                contentDiv.textContent += text;
-            }
-            scrollToBottom();
         }
-
-        // ==========================================
-        // EVENTS
-        // ==========================================
-        newChatBtn.addEventListener('click', handleNewChatBtn);
-
-        stopButton.addEventListener('click', () => {
-            if (abortController) {
-                abortController.abort();
-                isGenerating = false;
-                sendButton.style.display = 'block';
-                stopButton.style.display = 'none';
-                messageInput.disabled = false;
-                messageInput.focus();
-            }
-        });
 
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
