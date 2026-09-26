@@ -217,8 +217,10 @@
         // SESSIONS MANAGEMENT
         // ==========================================
         async function loadSessions() {
+            if (!jwtToken) return;
             try {
                 const res = await fetch(`${API_BASE}/sessions`, { headers: getHeaders() });
+                if (!res.ok) return;
                 const sessions = await res.json();
                 sessionList.innerHTML = '';
                 
@@ -573,7 +575,9 @@
 
         // Initialize
         window.addEventListener('DOMContentLoaded', async () => {
-            await loadSessions();
+            if (jwtToken) {
+                await loadSessions();
+            }
             if (!currentSessionId) {
                 // Fetch current list to select first, or show empty
                 if (sessionList.children.length > 0) {
