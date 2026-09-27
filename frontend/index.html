@@ -80,14 +80,19 @@
 
     <!-- Main Chat Area -->
     <main class="flex-1 flex flex-col h-full relative bg-zinc-900/30">
-        <header class="flex items-center gap-3 px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
-            <div class="p-2 bg-indigo-500/20 rounded-lg">
-                <i class="fa-solid fa-chart-network text-indigo-400 text-xl"></i>
+        <header class="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-indigo-500/20 rounded-lg">
+                    <i class="fa-solid fa-chart-network text-indigo-400 text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-zinc-100 tracking-tight">TradeSwarm</h1>
+                    <p id="header-session-title" class="text-xs text-zinc-400">Yeni Sohbet</p>
+                </div>
             </div>
-            <div>
-                <h1 class="text-lg font-bold text-zinc-100 tracking-tight">TradeSwarm</h1>
-                <p id="header-session-title" class="text-xs text-zinc-400">Yeni Sohbet</p>
-            </div>
+            <button id="voice-toggle-btn" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:bg-zinc-700 hover:text-white transition-all shadow-sm" title="Sesli Yanıtı Aç/Kapat">
+                <i class="fa-solid fa-volume-xmark"></i>
+            </button>
         </header>
 
         <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 flex flex-col">
@@ -118,14 +123,13 @@
 
                 <button
                     type="button"
-                    id="stop-button"
-                    class="hidden p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600/40 transition-colors"
-                    title="İptal Et"
+                    id="mic-button"
+                    class="p-3 bg-zinc-800 text-zinc-400 rounded-xl hover:bg-zinc-700 hover:text-white transition-colors shrink-0"
+                    title="Sesli Komut"
                 >
-                    <i class="fa-solid fa-stop"></i>
+                    <i class="fa-solid fa-microphone"></i>
                 </button>
-
-                <!-- Ses Kaydını Durdurma Butonu -->
+                
                 <button
                     type="button"
                     id="stop-recording-button"
@@ -136,21 +140,22 @@
                 </button>
 
                 <button
-                    type="button"
-                    id="mic-button"
-                    class="p-3 bg-zinc-800 text-zinc-400 rounded-xl hover:bg-zinc-700 hover:text-white transition-colors shrink-0"
-                    title="Sesli Komut"
-                >
-                    <i class="fa-solid fa-microphone"></i>
-                </button>
-                <button
                     type="submit"
                     id="send-button"
-                    class="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    class="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
                 >
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
-            </form>
+                
+                <button
+                    type="button"
+                    id="stop-button"
+                    class="hidden p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600/40 transition-colors shrink-0"
+                    title="İptal Et"
+                >
+                    <i class="fa-solid fa-stop"></i>
+                </button>
+                </form>
         </footer>
     </main>
 
@@ -236,11 +241,110 @@
         const chatContainer = document.getElementById('chat-container');
         const emptyState = document.getElementById('empty-state');
         const sendButton = document.getElementById('send-button');
-        const stopButton = document.getElementById('stop-button');
+                const stopButton = document.getElementById('stop-button');
+        stopButton.addEventListener('click', () => {
+            if (abortController) {
+                abortController.abort();
+            }
+            stopAudioPlayback();
+        });
+
         const sessionList = document.getElementById('session-list');
         const newChatBtn = document.getElementById('new-chat-btn');
         const headerTitle = document.getElementById('header-session-title');
         newChatBtn.addEventListener('click', handleNewChatBtn);
+
+        // Voice Mode Logic
+        let isVoiceModeEnabled = false;
+        const voiceToggleBtn = document.getElementById('voice-toggle-btn');
+        voiceToggleBtn.addEventListener('click', () => {
+            isVoiceModeEnabled = !isVoiceModeEnabled;
+            if (isVoiceModeEnabled) {
+                voiceToggleBtn.innerHTML = '<i class="fa-solid fa-volume-high text-indigo-400"></i>';
+                voiceToggleBtn.classList.add('bg-indigo-500/20', 'border', 'border-indigo-500/30');
+                voiceToggleBtn.classList.remove('bg-zinc-800');
+            } else {
+                voiceToggleBtn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+                voiceToggleBtn.classList.remove('bg-indigo-500/20', 'border', 'border-indigo-500/30');
+                voiceToggleBtn.classList.add('bg-zinc-800');
+            }
+        });
+
+        // Audio Queue Management
+        let audioQueue = [];
+        let audioBuffer = {};
+        let nextExpectedAudioIndex = 1;
+        let isPlayingAudio = false;
+        let currentAudio = null;
+
+        function checkAudioQueue() {
+            // Eğer beklediğimiz sıradaki ses pakedi geldiyse (ya da null olarak geldiyse) onu kuyruğa at
+            if (audioBuffer[nextExpectedAudioIndex] !== undefined) {
+                const audioData = audioBuffer[nextExpectedAudioIndex];
+                delete audioBuffer[nextExpectedAudioIndex];
+                nextExpectedAudioIndex++;
+                
+                if (audioData !== null) {
+                    audioQueue.push(audioData);
+                }
+                
+                if (!isPlayingAudio) {
+                    playNextAudio();
+                }
+                
+                // Belki bir sonraki de çoktan gelmiştir, tekrar kontrol et
+                checkAudioQueue();
+            }
+        }
+
+        function playNextAudio() {
+            if (audioQueue.length === 0) {
+                isPlayingAudio = false;
+                return;
+            }
+            isPlayingAudio = true;
+            const base64Audio = audioQueue.shift();
+            const audioData = "data:audio/wav;base64," + base64Audio;
+            currentAudio = new Audio(audioData);
+            currentAudio.onended = () => {
+                playNextAudio();
+            };
+            currentAudio.play().catch(e => {
+                console.error("Audio playback error:", e);
+                playNextAudio();
+            });
+        }
+
+        function stopAudioPlayback() {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+            }
+            audioQueue = [];
+            audioBuffer = {};
+            nextExpectedAudioIndex = 1;
+            isPlayingAudio = false;
+        }
+
+        async function fetchTTS(text, index) {
+            try {
+                const res = await fetch(`${API_BASE}/tts`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ text: text })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    audioBuffer[index] = data.audio;
+                } else {
+                    audioBuffer[index] = null;
+                }
+            } catch (err) {
+                audioBuffer[index] = null;
+            }
+            checkAudioQueue();
+        }
 
         // ==========================================
         // SESSIONS MANAGEMENT
@@ -540,6 +644,13 @@
             const msgId = Date.now().toString();
             createMessageElement('assistant', msgId);
             
+            // Ses varsa sustur ve kuyruğu temizle
+            stopAudioPlayback();
+            
+            let ttsBuffer = '';
+            let ttsSentenceIndex = 1;
+
+            
             try {
                 const response = await fetch(`${API_BASE}/chat`, {
                     method: 'POST',
@@ -572,12 +683,39 @@
                                     const data = JSON.parse(jsonStr);
                                     if (data.type === 'done') {
                                         done = true;
+                                        if (isVoiceModeEnabled && ttsBuffer.trim()) {
+                                            const cleanSentence = ttsBuffer.trim().replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/[*#_~`]/g, '').trim();
+                                            if (cleanSentence) {
+                                                fetchTTS(cleanSentence, ttsSentenceIndex++);
+                                            }
+                                            ttsBuffer = '';
+                                        }
                                         const typingIndicator = document.getElementById(`typing-${msgId}`);
                                         if (typingIndicator) typingIndicator.remove();
                                         // Update sidebar names
                                         loadSessions();
+                                    } else if (data.type === 'audio') {
+                                        audioBuffer[data.index] = data.audio;
+                                        checkAudioQueue();
                                     } else {
                                         updateMessage(msgId, data.text || '', data.type, data.tool, data);
+                                        if (isVoiceModeEnabled && data.type === 'content' && data.text) {
+                                            ttsBuffer += data.text;
+                                            const match = ttsBuffer.match(/([.?!:;\n]+)\s*/);
+                                            if (match) {
+                                                const endIdx = match.index + match[0].length;
+                                                const sentence = ttsBuffer.substring(0, endIdx).trim();
+                                                ttsBuffer = ttsBuffer.substring(endIdx).trimStart();
+                                                if (sentence) {
+                                                    const cleanSentence = sentence.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/[*#_~`]/g, '').trim();
+                                                    if (cleanSentence) {
+                                                        fetchTTS(cleanSentence, ttsSentenceIndex++);
+                                                    } else {
+                                                        // if nothing left (e.g. it was just an emoji), skip index
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 } catch (e) {
                                     console.error('Error parsing JSON:', e, jsonStr);
@@ -687,7 +825,13 @@
                             `;
                             messageInput.classList.remove('hidden');
                             micButton.style.display = 'block';
-                            sendButton.style.display = 'block';
+                            if (isGenerating) {
+                                sendButton.style.display = 'none';
+                                stopButton.style.display = 'block';
+                            } else {
+                                sendButton.style.display = 'block';
+                                stopButton.style.display = 'none';
+                            }
                             messageInput.focus();
                         }
                     };
@@ -700,6 +844,7 @@
                 messageInput.classList.add('hidden');
                 micButton.style.display = 'none';
                 sendButton.style.display = 'none';
+                stopButton.style.display = 'none';
                 
                 recordingIndicator.classList.remove('hidden');
                 recordingIndicator.style.display = 'flex';

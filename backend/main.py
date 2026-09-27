@@ -313,3 +313,38 @@ async def process_stt(req: STTRequest):
             else:
                 err = await resp.text()
                 raise HTTPException(status_code=resp.status, detail=f"OpenRouter Error: {err}")
+
+class TTSRequest(BaseModel):
+    text: str
+
+@app.post("/api/tts")
+async def process_tts(req: TTSRequest):
+    if not STT_API_KEY:
+        raise HTTPException(status_code=500, detail="API Key eksik")
+        
+    import io, wave, base64
+    async with aiohttp.ClientSession() as session:
+        payload = {
+            "model": "google/gemini-3.8-flash-lite-tts",
+            "input": req.text,
+            "voice": "Zephyr"
+        }
+        headers = {
+            "Authorization": f"Bearer {STT_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        async with session.post("https://openrouter.ai/api/v1/audio/speech", json=payload, headers=headers) as resp:
+            if resp.status == 200:
+                pcm_data = await resp.read()
+                wav_io = io.BytesIO()
+                with wave.open(wav_io, 'wb') as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(24000)
+                    wav_file.writeframes(pcm_data)
+                b64 = base64.b64encode(wav_io.getvalue()).decode('utf-8')
+                return {"audio": b64}
+            else:
+                err = await resp.text()
+                raise HTTPException(status_code=resp.status, detail=f"TTS Error: {err}")
