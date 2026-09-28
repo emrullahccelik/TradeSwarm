@@ -22,7 +22,7 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPane
   useEffect(() => {
     if (!sessionId) {
       clearMessages();
-    } else if (token) {
+    } else if (token && !isGenerating) {
       fetch(`/api/sessions/${sessionId}/messages`, {
         headers: { Authorization: `Bearer ${token}` }
       })

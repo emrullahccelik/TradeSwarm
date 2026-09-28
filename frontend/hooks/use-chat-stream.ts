@@ -64,7 +64,7 @@ export function useChatStream() {
             setMessages((prev) => {
               const msgs = [...prev];
               const lastMsg = msgs[msgs.length - 1];
-              if (lastMsg.id !== newMessageId) return msgs;
+              if (!lastMsg || lastMsg.id !== newMessageId) return msgs;
 
               if (event.type === "sub_agent_start" && event.run_id) {
                 activeSubAgents.add(event.run_id);

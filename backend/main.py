@@ -242,7 +242,12 @@ async def chat_endpoint(request: ChatRequest, db = Depends(get_db)):
     """
     return StreamingResponse(
         generate_chat_events(request.message, request.session_id, db),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 @app.get("/api/health")
