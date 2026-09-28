@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChatHeader } from "./chat-header";
 import { ChatMessages } from "./chat-messages";
 import { ChatInput } from "./chat-input";
@@ -16,8 +16,30 @@ interface ChatPanelProps {
 
 export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPanelProps) {
   const [isVoiceMode, setIsVoiceMode] = useState(false);
-  const { messages, isGenerating, sendMessage, stopGeneration } = useChatStream();
+  const { messages, setMessages, clearMessages, isGenerating, sendMessage, stopGeneration } = useChatStream();
   const { token } = useAuth();
+
+  useEffect(() => {
+    if (!sessionId) {
+      clearMessages();
+    } else if (token) {
+      fetch(`/api/sessions/${sessionId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+         if (Array.isArray(data)) {
+           setMessages(data.map((m: any) => ({
+             id: String(m.id),
+             role: m.role,
+             content: m.content,
+             uiEvents: m.ui_state || []
+           })));
+         }
+      })
+      .catch(err => console.error("Failed to load messages", err));
+    }
+  }, [sessionId, token, clearMessages, setMessages]);
 
   const {
     state: voiceState,

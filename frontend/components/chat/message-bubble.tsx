@@ -22,7 +22,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const elements: React.ReactNode[] = [];
   
   if (isUser) {
-    elements.push(<MessageContent key="content" content={message.content} />);
+    elements.push(<MessageContent key="content" content={message.content} isUser={true} />);
   } else {
     let currentReasoning = "";
     let reasoningCount = 0;

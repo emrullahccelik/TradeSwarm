@@ -16,7 +16,7 @@ function ChatLayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Basic auth check
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("tradeswarm_jwt");
     if (!token) {
       router.push("/login");
     }
@@ -27,7 +27,7 @@ function ChatLayoutContent({ children }: { children: React.ReactNode }) {
       await fetch(`/api/sessions/${id}`, {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+          "Authorization": `Bearer ${localStorage.getItem("tradeswarm_jwt")}`
         }
       });
       await refreshSessions();

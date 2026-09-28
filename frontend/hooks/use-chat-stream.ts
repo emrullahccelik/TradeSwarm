@@ -4,6 +4,13 @@ import { useState, useRef, useCallback } from "react";
 import { MessageGroup, UIEvent, ActiveSubAgent } from "@/types";
 import { fetchSSE } from "@/lib/api";
 
+const generateId = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
 export function useChatStream() {
   const [messages, setMessages] = useState<MessageGroup[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -30,9 +37,9 @@ export function useChatStream() {
       abortControllerRef.current = abortController;
       setIsGenerating(true);
 
-      const newMessageId = crypto.randomUUID();
+      const newMessageId = generateId();
       const userMessage: MessageGroup = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "user",
         content: text,
         uiEvents: [],

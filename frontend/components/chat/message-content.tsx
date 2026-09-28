@@ -10,9 +10,14 @@ import { cn } from "@/lib/utils";
 
 interface MessageContentProps {
   content: string;
+  isUser?: boolean;
 }
 
-export function MessageContent({ content }: MessageContentProps) {
+export function MessageContent({ content, isUser }: MessageContentProps) {
+  if (isUser) {
+    return <div className="whitespace-pre-wrap">{content}</div>;
+  }
+
   return (
     <div className="prose prose-chat dark:prose-invert max-w-none break-words">
       <ReactMarkdown
