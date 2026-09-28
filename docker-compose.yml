@@ -32,15 +32,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: tradeswarm-frontend
-    restart: always
-    env_file:
-      - .env
     ports:
-      - "3000:80"
-    volumes:
-      - ./frontend/index.html:/usr/share/nginx/html/index.html
-      - ./frontend/default.conf.template:/etc/nginx/templates/default.conf.template
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
 
 volumes:
   pgdata:

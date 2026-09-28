@@ -1,87 +1,144 @@
-# TradeSwarm 🚀
+<div align="center">
+  <h1>🚀 TradeSwarm AI</h1>
+  <p><strong>Advanced Multi-Agent Crypto Trading & Market Intelligence Platform</strong></p>
+  
+  [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg?logo=python&logoColor=white)](https://python.org)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+  [![Next.js](https://img.shields.io/badge/Next.js-15.0+-000000.svg?logo=next.js&logoColor=white)](https://nextjs.org)
+  [![LangGraph](https://img.shields.io/badge/LangGraph-Multi--Agent-FF9900.svg)](https://python.langchain.com/docs/langgraph/)
+  [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED.svg?logo=docker&logoColor=white)](https://docker.com)
+</div>
 
-TradeSwarm, LangGraph altyapısıyla geliştirilmiş, çoklu-ajan (multi-agent) mimarisine sahip zeki bir kripto para ticaret ve analiz asistanıdır. Kullanıcıların doğal dille verdiği karmaşık emirleri anlar, alt ajanlara (Sub-Agents) böler, paralel olarak çalıştırır ve sonuçları şık bir arayüzde sunar.
+<br />
 
-## 🌟 Özellikler
+TradeSwarm is an enterprise-grade, **multi-agent AI system** designed to automate and orchestrate cryptocurrency trading operations, market research, and portfolio analysis. Built on a scalable, asynchronous architecture, it interprets complex natural language commands, dynamically spawns specialized sub-agents, executes them concurrently, and streams real-time insights to a high-performance modern web interface.
 
-- **Çoklu-Ajan Mimarisi (Multi-Agent):** 
-  - 🧠 **Orchestrator (Ana Ajan):** Kullanıcı isteklerini analiz eder, plan yapar ve görevleri alt ajanlara dağıtır.
-  - 📈 **Piyasa Analisti (Market Analyzer):** CoinGecko üzerinden anlık fiyat, hacim, trend ve borsa listelemelerini çeker.
-  - 💼 **Trader Ajanı (Trader Agent):** Binance entegrasyonu ile spot bakiye sorgulama ve işlem (trade) simülasyonları yapar.
-  - 🔍 **Araştırmacı Ajan (Researcher):** Tavily arama motoru ile güncel kripto haberlerini ve makroekonomik gelişmeleri araştırır.
-- **Paralel Çalıştırma:** Ajanlar görevleri birbirini beklemeden aynı anda çalıştırır. (Örn: Bir yandan Binance bakiyesi çekilirken, diğer yandan güncel fiyatlar analiz edilir).
-- **Akıllı Arayüz (UI):** ChatGPT benzeri, ajanların çalışma adımlarını, çağırdıkları araçları (tools) ve düşünce süreçlerini gerçek zamanlı kronolojik sırayla (Streaming) gösteren pürüzsüz web arayüzü.
-- **Kalıcı Hafıza:** PostgreSQL destekli asenkron veritabanı yapısı sayesinde geçmiş sohbetleriniz ve ajanların bağlam hafızası (Memory) asla kaybolmaz. Sohbet başlıkları Llama 3.1 ile otomatik oluşturulur.
-- **Telegram Bildirimleri:** Alınan kararları, piyasa raporlarını veya kritik bakiye uyarılarını tek bir komutla anında Telegram telefonunuza iletir.
+This project demonstrates expertise in **AI orchestration, real-time data streaming (SSE), modern full-stack development, and distributed systems architecture.**
 
-## 🛠 Teknolojiler
+---
 
-- **Backend:** Python, FastAPI, Uvicorn, SQLAlchemy (Async), PostgreSQL
-- **Yapay Zeka:** LangChain, LangGraph (v2), OpenRouter (Llama 3.1, vb.)
-- **Frontend:** HTML, TailwindCSS, Vanilla JS (SSE - Server Sent Events)
-- **Altyapı:** Docker & Docker Compose, Nginx
+## 🌟 Key Highlights & Engineering Achievements
 
-## 🚀 Kurulum & Çalıştırma
+*   **Orchestrator-Worker Multi-Agent Architecture (LangGraph):** Employs a robust Supervisor-Worker pattern. A central Orchestrator LLM intelligently delegates sub-tasks (e.g., market analysis, portfolio checks) to specialized sub-agents. These agents run concurrently, vastly reducing overall latency.
+*   **Gapless Real-Time Voice Chat (Web Audio API):** Features a fully hands-free walkie-talkie mode. It uses MediaRecorder for STT, custom streaming text chunking algorithms for the LLM response, and the **Web Audio API (`AudioBufferSourceNode`)** to achieve zero-latency, gapless Text-to-Speech (TTS) playback—a significant upgrade over standard HTML5 audio players.
+*   **True Real-Time Streaming UI (Server-Sent Events):** The backend streams execution traces, intermediate tool calls, agent reasoning steps, and final tokens to the client asynchronously. The Next.js frontend reconstructs this state tree dynamically in real-time.
+*   **Production-Ready Modern Frontend:** Built with **Next.js 15 (App Router)**, React 19, and Tailwind CSS v3. Features a highly modular component architecture utilizing **shadcn/ui**, `framer-motion` for smooth layout transitions, and comprehensive state management via custom React hooks.
+*   **Persistent Contextual Memory:** Utilizes PostgreSQL with asynchronous SQLAlchemy to persistently store conversational state, UI events, and session metadata, enabling the LLM to retain long-term context seamlessly.
 
-Proje tamamen Dockerize edilmiştir. Çalıştırmak için sisteminizde `docker` ve `docker-compose` kurulu olması yeterlidir.
+## 🏗 System Architecture & Workflows
 
-### 1. Ortam Değişkenlerini Ayarlayın
-Proje dizininde bir `.env` dosyası oluşturun ve API anahtarlarınızı girin:
+TradeSwarm is composed of two decoupled services communicating over REST and SSE, fully containerized via Docker.
 
-```env
-# 1. Orchestrator Agent (Ana Ajan - Yüksek kapasiteli model)
-ORCHESTRATOR_BASE_URL=https://openrouter.ai/api/v1
-ORCHESTRATOR_API_KEY=your_orchestrator_api_key
-ORCHESTRATOR_MODEL=deepseek/deepseek-v4-flash
+### 1. Agentic Workflow (LangGraph Architecture)
 
-# 2. Sub-Agents (Alt Ajanlar - Hızlı/Ucuz modeller)
-SUB_AGENT_BASE_URL=https://openrouter.ai/api/v1
-SUB_AGENT_API_KEY=your_subagent_api_key
-SUB_AGENT_MODEL=deepseek/deepseek-v4-flash
+The core intelligence is driven by a stateful multi-agent graph. Unlike traditional linear LLM chains, TradeSwarm uses a **Supervisor-Worker routing mechanism**. The Orchestrator decides *which* specialized sub-agent to invoke, and can run them in parallel to aggregate complex data before delivering a final verdict.
 
-# 3. Title Generator (Sohbet Başlığı Üretici - Hafif modeller)
-TITLE_BASE_URL=https://openrouter.ai/api/v1
-TITLE_API_KEY=your_title_api_key
-TITLE_MODEL=meta-llama/llama-3.1-8b-instruct
-
-# Binance API
-BINANCE_SPOT_API_KEY=your_binance_api_key
-BINANCE_SPOT_SECRET_KEY=your_binance_secret_key
-
-# Araştırma Aracı & API'ler
-TAVILY_API_KEY=your_tavily_api_key
-COINGECKO_API_KEY=your_coingecko_api_key
-
-# Telegram Bildirimleri (Opsiyonel)
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_telegram_chat_id
-
-# Veritabanı
-POSTGRES_USER=swarmuser
-POSTGRES_PASSWORD=swarmpassword
-POSTGRES_DB=tradeswarm
-DB_HOST=localhost
-DB_PORT=5432
+```mermaid
+graph TD
+    User([👤 User Request]) --> API[FastAPI Endpoint]
+    API --> Memory[(PostgreSQL MemorySaver)]
+    Memory --> Orchestrator{🧠 Orchestrator Agent}
+    
+    Orchestrator -->|Market Queries| Analyst[📈 Market Analyzer Agent]
+    Orchestrator -->|Portfolio/Trade| Trader[💼 Trader Agent]
+    Orchestrator -->|News/Macro| Researcher[🔍 Researcher Agent]
+    
+    Analyst -.->|CoinGecko API| Orchestrator
+    Trader -.->|Binance API| Orchestrator
+    Researcher -.->|Tavily API| Orchestrator
+    
+    Orchestrator -->|Streaming JSON| SSE[SSE Streamer]
+    SSE --> UI([💻 Next.js Frontend])
+    
+    classDef orchestrator fill:#2496ED,stroke:#fff,stroke-width:2px,color:#fff
+    classDef worker fill:#FF9900,stroke:#fff,stroke-width:2px,color:#fff
+    class Orchestrator orchestrator
+    class Analyst,Trader,Researcher worker
 ```
 
-### 2. Konteynerleri Başlatın
-Aşağıdaki komutla tüm altyapıyı tek seferde ayağa kaldırın:
+### 2. Gapless Real-Time Voice Chat Pipeline (STT & TTS)
+
+Achieving a native-feeling, walkie-talkie style voice interface in the browser requires bypassing traditional HTML5 audio limitations. We implemented a custom Voice Chat pipeline using the **Web Audio API** and a proprietary **Streaming Sentence Splitter**.
+
+**How it works:**
+1. **STT (Speech-to-Text):** The browser records via `MediaRecorder`. Upon silence or button release, the BLOB is base64 encoded and sent to the backend `Whisper API` via OpenRouter.
+2. **LLM Generation:** The text is fed to the Orchestrator, which starts streaming chunks (tokens).
+3. **Chunking & TTS (Text-to-Speech):** As tokens arrive on the client, our `StreamingSentenceSplitter` buffers them. As soon as a full sentence is formed (detecting punctuation without breaking decimals like `$45.50`), it triggers a background TTS fetch.
+4. **Gapless Playback:** Base64 WAV files arrive out of order. The `useGaplessAudio` hook decodes them into `AudioBuffer` objects and precisely schedules their playback times using `AudioBufferSourceNode.start(scheduledTime)`, eliminating the 100-250ms gap typical of standard `Audio` elements.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Mic as Next.js (MediaRecorder)
+    participant STT as Whisper STT API
+    participant LLM as Orchestrator LLM
+    participant TTS as TTS API
+    participant Audio as Web Audio API
+    
+    User->>Mic: Speaks & Releases
+    Mic->>STT: POST /api/stt (Base64 Blob)
+    STT-->>Mic: Transcript: "Bitcoin'i analiz et"
+    Mic->>LLM: POST /api/chat (SSE Stream)
+    
+    LLM-->>Mic: Chunk 1: "Şu anki "
+    LLM-->>Mic: Chunk 2: "fiyatı "
+    LLM-->>Mic: Chunk 3: "$64,000."
+    Note over Mic: Sentence Splitter triggers!
+    Mic->>TTS: POST /api/tts ("Şu anki fiyatı $64,000.")
+    
+    LLM-->>Mic: Chunk 4: " Başka "
+    LLM-->>Mic: Chunk 5: "sorun var mı?"
+    Note over Mic: Sentence Splitter triggers!
+    Mic->>TTS: POST /api/tts ("Başka sorun var mı?")
+    
+    TTS-->>Audio: Base64 WAV (Sentence 1)
+    Audio->>User: 🔊 Plays Sentence 1 immediately
+    TTS-->>Audio: Base64 WAV (Sentence 2)
+    Note over Audio: Schedules gapless playback
+    Audio->>User: 🔊 Plays Sentence 2 seamlessly
+    Note over Audio: Audio finishes -> Auto-Listen triggers
+    Audio->>Mic: Starts recording automatically
+```
+
+### 3. Frontend (Next.js / React / Tailwind)
+- **Framework:** Next.js 15 (App Router) ensuring optimal chunking and fast initial load times.
+- **State Management:** Complex React hooks (`useVoiceChat`, `useChatStream`, `useGaplessAudio`) to manage the heavily asynchronous and event-driven nature of the LLM stream.
+- **UI/UX:** Vercel AI Chatbot-inspired design. Implements Dark/Light mode (`next-themes`), highly customized Markdown rendering (syntax highlighting, GFM), and collapsible reasoning blocks for Chain-of-Thought transparency.
+
+## 🚀 Quick Start Guide
+
+The entire stack is containerized for reproducibility and ease of deployment.
+
+### Prerequisites
+- Docker & Docker Compose
+- Node.js (Only if running frontend outside of Docker for development)
+
+### 1. Environment Configuration
+Create a `.env` file in the root directory. Configure your AI providers (OpenRouter/OpenAI), Database credentials, and 3rd party APIs (Binance, CoinGecko, Tavily). *Refer to `.env.example` for the exact schema.*
+
+### 2. Launch the Swarm
 ```bash
+# Build and start the PostgreSQL database, FastAPI backend, and Next.js frontend
 docker-compose up -d --build
 ```
-*Bu komut; PostgreSQL veritabanını, FastAPI sunucusunu ve Nginx arayüz sunucusunu başlatacaktır.*
 
-### 3. Arayüze Erişin
-Tarayıcınızı açın ve aşağıdaki adrese gidin:
-👉 `http://localhost:3000`
+### 3. Access the Application
+- **Frontend UI:** `http://localhost:3000`
+- **Backend API Docs (Swagger):** `http://localhost:8000/docs`
 
-## 🧠 Nasıl Çalışır? (Teknik Mimari)
-Sistem LangGraph StateGraph üzerine kuruludur.
-1. **Kullanıcı Girdisi:** Arayüzden gelen mesaj FastAPI'ye iletilir.
-2. **Orchestrator Düğümü:** Ana ajan mesajı alır. Gerekli araçları (Piyasa Analisti, Trader vb.) seçer.
-3. **Paralel Çalışma:** Seçilen alt ajanlar, kendi `run_id` ve `parent_ids` kimlikleriyle izole şekilde arka planda çalışır.
-4. **Gerçek Zamanlı Akış (SSE):** Alt ajanların çalıştırdığı toollar ve sonuçları, Backend'den Frontend'e `Server-Sent Events` ile anlık olarak aktarılır.
-5. **Kapsüllü UI:** Frontend, gelen asenkron verileri ebeveyn ID'lerine göre eşleştirip, ait oldukları alt ajanın UI kutusuna dinamik olarak yerleştirir.
+## 🧠 Technical Deep-Dive: Event Streaming & UI Hydration
 
-## 🤝 Katkıda Bulunma
-Bu proje geliştirilmeye açıktır. Yeni bir "Ajan" veya "Borsa" entegre etmek isterseniz Pull Request göndermekten çekinmeyin!
+One of the most complex engineering challenges in this project was mapping the deeply nested, asynchronous tool-call graph of LangChain to a flat React UI. 
+
+**The Solution:**
+1. The FastAPI backend intercepts `astream_events` from the LangGraph checkpointer.
+2. It flattens these into distinct `UIEvent` types (`tool_start`, `sub_agent_start`, `reasoning`, `content`, `done`).
+3. Each event carries `run_id` and `parent_ids`.
+4. The React frontend (`useChatStream` hook) consumes the SSE stream, reducing the events into a structured `MessageGroup` object.
+5. React deeply re-renders only the specific `MessageBubble` or `SubAgentCard` associated with the currently executing `run_id`, showing spinners for active tools and checkmarks for completed ones, all in real-time.
+
+## 🤝 Let's Connect
+
+I am actively looking for roles where I can leverage my expertise in **AI Engineering, Full-Stack Development, and Systems Architecture** to build impactful, scalable products. 
+
+If you're an engineering manager or technical recruiter looking for a developer who understands both the complex backend orchestration of LLMs and the nuances of building a butter-smooth frontend user experience—let's talk!
