@@ -34,7 +34,8 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewChat,
         </h3>
       </div>
       
-      <ScrollArea className="flex-1 px-3">
+      {/* Radix viewport içeriği display:table ile sarar; uzun başlıklar satırı genişletip sil butonunu taşırmasın */}
+      <ScrollArea className="flex-1 px-3 [&_[data-radix-scroll-area-viewport]>div]:!block">
         {sessions.map((session) => (
           <SessionItem
             key={session.id}

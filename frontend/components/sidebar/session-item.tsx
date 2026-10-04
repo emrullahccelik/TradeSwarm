@@ -34,7 +34,7 @@ export function SessionItem({ session, isActive, onClick, onDelete }: SessionIte
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
       )}
       
-      <div className="flex items-center space-x-3 overflow-hidden">
+      <div className="flex flex-1 min-w-0 items-center space-x-3 overflow-hidden">
         <MessageSquare className="h-4 w-4 shrink-0" />
         <span className="truncate text-sm">
           {session.title || "İsimsiz Sohbet"}
@@ -45,7 +45,7 @@ export function SessionItem({ session, isActive, onClick, onDelete }: SessionIte
         variant="ghost"
         size="icon"
         onClick={handleDelete}
-        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+        className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
         title="Sil"
       >
         <Trash2 className="h-4 w-4" />
