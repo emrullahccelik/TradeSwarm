@@ -51,6 +51,79 @@ Speak into the composer, confirm with ✓, and edit the transcript before sendin
 *   **Persistent Chat History:** PostgreSQL (async SQLAlchemy) stores messages, UI events and sessions, so conversations — including tool calls and sub-agent cards — are fully restored after a reload or restart, and chats get an LLM-generated title.
 *   **Secured API:** All endpoints except login are protected with JWT authentication.
 
+## 🤖 Agents & Tools
+
+TradeSwarm uses a **supervisor–worker** hierarchy: the Orchestrator talks to the user and delegates; each sub-agent is a specialist with its own tools and returns a structured report to the Orchestrator, which writes the final answer. Sub-agents never talk to the user directly.
+
+| Agent | Responsibility | Data source | Model (`.env`) | Tools |
+|---|---|---|---|---|
+| 🧠 **Orchestrator** | Understands the request, picks and calls sub-agents (in parallel when needed), merges their reports into the final answer | Sub-agents | `ORCHESTRATOR_MODEL` | 5 |
+| 💼 **Trader** | Balances, prices, order book and order management | Binance Spot **Testnet** | `SUB_AGENT_MODEL` | 11 |
+| 🔍 **Researcher** | News, project fundamentals and macro developments from the web | Tavily | `SUB_AGENT_MODEL` | 2 |
+| 📈 **Market Analyzer** | Prices, market data, exchange listings, trends and corporate holdings | CoinGecko | `SUB_AGENT_MODEL` | 8 |
+
+⚠️ marks tools that change state (orders, chat title) or send something outside the app.
+
+<details>
+<summary><strong>🧠 Orchestrator</strong> — 5 tools</summary>
+
+| Tool | What it does |
+|---|---|
+| `ask_trader(query)` | Delegates trading, balance and order requests to the Trader agent |
+| `ask_researcher(query)` | Delegates news and web research to the Researcher agent |
+| `ask_market_analyzer(query)` | Delegates price, market and statistics questions to the Market Analyzer agent |
+| `update_chat_title(new_title)` ⚠️ | Renames the current chat when the topic changes or the user asks |
+| `notify_user(message)` ⚠️ | Sends a summary of key analyses or executed trades to the user via Telegram |
+
+</details>
+
+<details>
+<summary><strong>💼 Trader</strong> (Binance Spot Testnet) — 11 tools</summary>
+
+| Tool | What it does |
+|---|---|
+| `get_exchange_info(symbol)` | Trading rules for a pair (min quantity, price/lot step) |
+| `get_symbol_price(symbol)` | Current price of a pair, or of the whole market with `ALL` |
+| `get_klines(symbol, interval, limit)` | Historical candlesticks (`1m`, `1h`, `1d`, …) |
+| `get_order_book(symbol, limit)` | Order book depth: bids and asks |
+| `get_account_balance(asset)` | Account balances, optionally for a single asset |
+| `get_my_trades(symbol, limit)` | Your past trades for a pair |
+| `get_open_orders(symbol)` | Open orders, optionally filtered by pair |
+| `create_market_order(symbol, side, quantity)` ⚠️ | Places a market BUY/SELL order |
+| `create_limit_order(symbol, side, quantity, price)` ⚠️ | Places a limit order at a given price |
+| `create_oco_order(symbol, side, quantity, price, stop_price, stop_limit_price)` ⚠️ | Places an OCO order (take-profit + stop-loss together) |
+| `cancel_open_order(symbol, order_id)` ⚠️ | Cancels an open order by ID |
+
+</details>
+
+<details>
+<summary><strong>🔍 Researcher</strong> (Tavily) — 2 tools</summary>
+
+| Tool | What it does |
+|---|---|
+| `search_market_news(query)` | Searches the web for up-to-date crypto news, project updates and macro developments |
+| `extract_webpage_content(urls)` | Extracts the full text of up to 3 pages to read an article in depth |
+
+The Researcher is instructed to use only what it found, cite its sources, and say so when it finds nothing instead of guessing.
+
+</details>
+
+<details>
+<summary><strong>📈 Market Analyzer</strong> (CoinGecko) — 8 tools</summary>
+
+| Tool | What it does |
+|---|---|
+| `get_simple_price(coin_ids, vs_currencies)` | Current prices for one or more coins |
+| `get_coin_details(coin_id)` | Market cap, developer (GitHub) activity and community data |
+| `get_coin_exchanges(coin_id, limit)` | Exchanges and pairs a coin trades on, with volumes |
+| `get_historical_price(coin_id, date_dd_mm_yyyy)` | Price and market cap on a past date |
+| `get_category_coins(category_id, limit)` | Top coins in a category (e.g. `artificial-intelligence`, `meme-token`) |
+| `get_global_market_data()` | Total market cap, BTC dominance and other macro figures |
+| `get_trending_search()` | Top 7 trending coins on CoinGecko |
+| `get_public_treasury(coin_id)` | BTC/ETH held by public companies (e.g. MicroStrategy, Tesla) |
+
+</details>
+
 ## 🏗 System Architecture & Workflows
 
 TradeSwarm consists of a FastAPI backend, a Next.js frontend and PostgreSQL, communicating over REST and SSE and containerized with Docker Compose.
