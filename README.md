@@ -17,10 +17,33 @@ This project demonstrates expertise in **AI orchestration, real-time data stream
 
 ---
 
+## 📸 Demo
+
+### Multi-Agent Research in Action
+The Orchestrator delegates the question to the Researcher sub-agent; its progress, tool calls and final answer stream into the chat in real time, and the chat gets an LLM-generated title when the first answer completes.
+
+<p align="center">
+  <img src="docs/assets/agent-demo.gif" alt="Orchestrator delegating to the Researcher sub-agent" width="900" />
+</p>
+
+### Hands-Free Voice Mode
+ChatGPT-style voice conversation: the transcript stays on screen, the orb reacts to your voice and to the assistant's speech, and the end of your turn is detected automatically from silence — no push-to-talk. Tap the orb to interrupt.
+
+<p align="center">
+  <img src="docs/assets/voice-demo.gif" alt="Hands-free voice mode" width="900" />
+</p>
+
+### Inline Dictation
+Speak into the composer, confirm with ✓, and edit the transcript before sending.
+
+<p align="center">
+  <img src="docs/assets/dictation-demo.gif" alt="Inline dictation" width="900" />
+</p>
+
 ## 🌟 Key Highlights & Engineering Achievements
 
 *   **Orchestrator-Worker Multi-Agent Architecture (LangGraph):** Employs a robust Supervisor-Worker pattern. A central Orchestrator LLM intelligently delegates sub-tasks (e.g., market analysis, portfolio checks) to specialized sub-agents. These agents run concurrently, vastly reducing overall latency.
-*   **Gapless Real-Time Voice Chat (Web Audio API):** Features a fully hands-free walkie-talkie mode. It uses MediaRecorder for STT, custom streaming text chunking algorithms for the LLM response, and the **Web Audio API (`AudioBufferSourceNode`)** to achieve zero-latency, gapless Text-to-Speech (TTS) playback—a significant upgrade over standard HTML5 audio players.
+*   **Gapless Real-Time Voice Chat (Web Audio API):** Features a fully hands-free, ChatGPT-style voice mode with silence-based end-of-turn detection, plus inline dictation in the composer. It uses MediaRecorder for STT, custom streaming text chunking algorithms for the LLM response, and the **Web Audio API (`AudioBufferSourceNode`)** to achieve zero-latency, gapless Text-to-Speech (TTS) playback—a significant upgrade over standard HTML5 audio players.
 *   **True Real-Time Streaming UI (Server-Sent Events):** The backend streams execution traces, intermediate tool calls, agent reasoning steps, and final tokens to the client asynchronously. The Next.js frontend reconstructs this state tree dynamically in real-time.
 *   **Production-Ready Modern Frontend:** Built with **Next.js 15 (App Router)**, React 19, and Tailwind CSS v3. Features a highly modular component architecture utilizing **shadcn/ui**, `framer-motion` for smooth layout transitions, and comprehensive state management via custom React hooks.
 *   **Persistent Contextual Memory:** Utilizes PostgreSQL with asynchronous SQLAlchemy to persistently store conversational state, UI events, and session metadata, enabling the LLM to retain long-term context seamlessly.
@@ -58,10 +81,10 @@ graph TD
 
 ### 2. Gapless Real-Time Voice Chat Pipeline (STT & TTS)
 
-Achieving a native-feeling, walkie-talkie style voice interface in the browser requires bypassing traditional HTML5 audio limitations. We implemented a custom Voice Chat pipeline using the **Web Audio API** and a proprietary **Streaming Sentence Splitter**.
+Achieving a native-feeling, hands-free voice interface in the browser requires bypassing traditional HTML5 audio limitations. We implemented a custom Voice Chat pipeline using the **Web Audio API** and a proprietary **Streaming Sentence Splitter**.
 
 **How it works:**
-1. **STT (Speech-to-Text):** The browser records via `MediaRecorder`. Upon silence or button release, the BLOB is base64 encoded and sent to the backend `Whisper API` via OpenRouter.
+1. **STT (Speech-to-Text):** The browser records via `MediaRecorder` while a lightweight voice activity detector (RMS level with an adaptive noise floor) watches the mic. After ~1.1s of silence following speech, the BLOB is base64 encoded and sent to the backend `Whisper API` via OpenRouter.
 2. **LLM Generation:** The text is fed to the Orchestrator, which starts streaming chunks (tokens).
 3. **Chunking & TTS (Text-to-Speech):** As tokens arrive on the client, our `StreamingSentenceSplitter` buffers them. As soon as a full sentence is formed (detecting punctuation without breaking decimals like `$45.50`), it triggers a background TTS fetch.
 4. **Gapless Playback:** Base64 WAV files arrive out of order. The `useGaplessAudio` hook decodes them into `AudioBuffer` objects and precisely schedules their playback times using `AudioBufferSourceNode.start(scheduledTime)`, eliminating the 100-250ms gap typical of standard `Audio` elements.
@@ -75,7 +98,7 @@ sequenceDiagram
     participant TTS as TTS API
     participant Audio as Web Audio API
     
-    User->>Mic: Speaks & Releases
+    User->>Mic: Speaks, then pauses (VAD)
     Mic->>STT: POST /api/stt (Base64 Blob)
     STT-->>Mic: Transcript: "Bitcoin'i analiz et"
     Mic->>LLM: POST /api/chat (SSE Stream)
