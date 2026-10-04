@@ -1,10 +1,9 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { ChatHeader } from "./chat-header";
 import { ChatMessages } from "./chat-messages";
 import { ChatInput } from "./chat-input";
 import { useChatStream } from "@/hooks/use-chat-stream";
-import { VoiceChatOverlay } from "@/components/voice/voice-chat-overlay";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceChat } from "@/hooks/use-voice-chat";
 import { apiGet, apiPost } from "@/lib/api";
@@ -18,7 +17,6 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate, onResponseDone }: ChatPanelProps) {
-  const [isVoiceMode, setIsVoiceMode] = useState(false);
   const { messages, setMessages, clearMessages, isGenerating, sendMessage, stopGeneration } = useChatStream();
   const { token } = useAuth();
 
@@ -56,17 +54,8 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate, onResponse
     [sendMessage, onResponseDone]
   );
 
-  const {
-    state: voiceState,
-    audioLevel,
-    autoListenEnabled,
-    toggleAutoListen,
-    startVoiceChat,
-    stopVoiceChat,
-    stopRecording
-  } = useVoiceChat(sessionId || "", sendAndRefresh, token);
-
-  const handleSendMessage = async (text: string) => {
+  // Yazılı ve sesli mesajlar aynı yoldan gider; akış bitince resolve olur
+  const handleSendMessage = async (text: string, onContentChunk?: (chunk: string) => void) => {
     let currentSessionId = sessionId;
 
     if (!currentSessionId) {
@@ -81,51 +70,18 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate, onResponse
       }
     }
 
-    if (currentSessionId) {
-      sendAndRefresh(text, currentSessionId);
-    }
+    await sendAndRefresh(text, currentSessionId, undefined, onContentChunk);
   };
 
-  const toggleVoiceMode = () => {
-    if (isVoiceMode) {
-      setIsVoiceMode(false);
-      stopVoiceChat();
-    } else {
-      setIsVoiceMode(true);
-    }
-  };
+  const voice = useVoiceChat(handleSendMessage);
 
   return (
     <div className="flex flex-col h-full w-full bg-background relative overflow-hidden">
-      <ChatHeader 
-        sessionTitle={sessionTitle} 
-        onVoiceToggle={toggleVoiceMode} 
-        isVoiceEnabled={isVoiceMode} 
-      />
-      
-      <ChatMessages 
-        messages={messages} 
-        onSendMessage={handleSendMessage} 
-      />
-      
-      <ChatInput 
-        onSend={handleSendMessage} 
-        onStop={stopGeneration} 
-        onMicClick={toggleVoiceMode} 
-        isGenerating={isGenerating} 
-      />
-      
-      {isVoiceMode && (
-        <VoiceChatOverlay 
-          state={voiceState}
-          audioLevel={audioLevel}
-          autoListenEnabled={autoListenEnabled}
-          onToggleAutoListen={toggleAutoListen}
-          onStartRecording={startVoiceChat}
-          onStopRecording={stopRecording}
-          onClose={toggleVoiceMode}
-        />
-      )}
+      <ChatHeader sessionTitle={sessionTitle} />
+
+      <ChatMessages messages={messages} onSendMessage={(text) => handleSendMessage(text)} />
+
+      <ChatInput onSend={(text) => handleSendMessage(text)} onStop={stopGeneration} isGenerating={isGenerating} voice={voice} />
     </div>
   );
 }

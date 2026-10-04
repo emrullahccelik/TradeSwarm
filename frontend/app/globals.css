@@ -166,3 +166,31 @@ pre code.hljs {
 .prose-chat img {
   @apply rounded-lg max-w-full my-3;
 }
+
+/* Sesli mod küresi (ChatGPT tarzı gökyüzü + bulut) */
+.voice-orb {
+  background: radial-gradient(circle at 35% 25%, #e0e7ff 0%, #a5b4fc 30%, #6366f1 65%, #4338ca 100%);
+  will-change: transform;
+}
+
+.voice-orb-clouds {
+  background:
+    radial-gradient(ellipse 60% 35% at 55% 85%, rgba(255, 255, 255, 0.9) 0%, transparent 70%),
+    radial-gradient(ellipse 45% 30% at 20% 75%, rgba(255, 255, 255, 0.7) 0%, transparent 70%),
+    radial-gradient(ellipse 35% 25% at 85% 65%, rgba(255, 255, 255, 0.5) 0%, transparent 70%);
+  animation: orb-drift 9s linear infinite;
+}
+
+.animate-orb-breathe {
+  animation: orb-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes orb-drift {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orb-breathe {
+  0%, 100% { filter: brightness(1); opacity: 1; }
+  50% { filter: brightness(1.25); opacity: 0.8; }
+}

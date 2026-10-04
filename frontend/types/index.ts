@@ -46,12 +46,12 @@ export interface UIEvent {
 // ==========================================
 
 export type VoiceChatState =
-  | "idle"           // Beklemede
-  | "recording"      // Kullanıcı konuşuyor
-  | "transcribing"   // STT çalışıyor
-  | "thinking"       // LLM cevap üretiyor
-  | "speaking"       // TTS ses çalıyor
-  | "auto-listening"; // Otomatik tekrar dinleme (kısa bekleme)
+  | "idle"          // Sesli mod kapalı
+  | "listening"     // Kullanıcıyı dinliyor
+  | "muted"         // Mikrofon kapalı
+  | "transcribing"  // STT çalışıyor
+  | "thinking"      // LLM cevap üretiyor
+  | "speaking";     // TTS ses çalıyor
 
 // ==========================================
 // API REQUEST/RESPONSE TYPES

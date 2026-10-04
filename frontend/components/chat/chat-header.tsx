@@ -1,16 +1,14 @@
 "use client";
 
-import { Moon, Sun, Settings, Mic } from "lucide-react";
+import { Moon, Sun, Settings } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
 interface ChatHeaderProps {
   sessionTitle?: string;
-  onVoiceToggle: () => void;
-  isVoiceEnabled?: boolean;
 }
 
-export function ChatHeader({ sessionTitle, onVoiceToggle, isVoiceEnabled }: ChatHeaderProps) {
+export function ChatHeader({ sessionTitle }: ChatHeaderProps) {
   const { theme, setTheme } = useTheme();
 
   return (
@@ -22,16 +20,6 @@ export function ChatHeader({ sessionTitle, onVoiceToggle, isVoiceEnabled }: Chat
       </div>
       
       <div className="flex items-center space-x-1 shrink-0">
-        <Button
-          variant={isVoiceEnabled ? "default" : "ghost"}
-          size="icon"
-          onClick={onVoiceToggle}
-          className="rounded-full"
-          title="Sesli Mod"
-        >
-          <Mic className="h-5 w-5" />
-        </Button>
-        
         <Button
           variant="ghost"
           size="icon"

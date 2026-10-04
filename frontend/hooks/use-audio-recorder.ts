@@ -1,125 +1,105 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useMemo } from "react";
 import { getSupportedAudioMimeType } from "@/lib/audio-utils";
 
+/**
+ * Mikrofon akışını açık tutar ve üzerinde art arda kayıt alınmasını sağlar.
+ * Ses seviyesi state yerine ref ile okunur (getLevel), böylece her karede yeniden render olmaz.
+ */
 export function useAudioRecorder() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const sampleBufferRef = useRef<Float32Array<ArrayBuffer> | null>(null);
 
-  const cleanup = useCallback(() => {
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+  const close = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.ondataavailable = null;
+      recorderRef.current.onstop = null;
+      recorderRef.current.stop();
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-    }
+    recorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    audioContextRef.current?.close().catch(() => {});
     audioContextRef.current = null;
     analyserRef.current = null;
-    mediaRecorderRef.current = null;
   }, []);
 
-  useEffect(() => {
-    return cleanup;
-  }, [cleanup]);
+  useEffect(() => close, [close]);
 
-  const updateAudioLevel = useCallback(() => {
-    if (!analyserRef.current) return;
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
+  const open = useCallback(async () => {
+    if (streamRef.current) return;
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    streamRef.current = stream;
+
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const audioCtx = new AudioContextClass();
+    audioContextRef.current = audioCtx;
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    analyserRef.current = analyser;
+    sampleBufferRef.current = new Float32Array(analyser.fftSize);
+  }, []);
+
+  /** Ham RMS seviyesi (sessizlik ~0.005, normal konuşma ~0.03-0.2) */
+  const getLevel = useCallback(() => {
+    const analyser = analyserRef.current;
+    const buffer = sampleBufferRef.current;
+    if (!analyser || !buffer) return 0;
+    analyser.getFloatTimeDomainData(buffer);
     let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-    const average = sum / dataArray.length;
-    setAudioLevel(Math.min(1, average / 128));
-    animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+    for (let i = 0; i < buffer.length; i++) sum += buffer[i] * buffer[i];
+    return Math.sqrt(sum / buffer.length);
   }, []);
 
   const startRecording = useCallback(async () => {
-    try {
-      cleanup();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      streamRef.current = stream;
-
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioContext();
-      audioContextRef.current = audioCtx;
-      const analyser = audioCtx.createAnalyser();
-      analyserRef.current = analyser;
-      analyser.fftSize = 256;
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      updateAudioLevel();
-
-      const mimeType = getSupportedAudioMimeType();
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-      
-      setIsRecording(true);
-      recorder.start();
-    } catch (err) {
-      console.error("Failed to start recording", err);
-      setIsRecording(false);
-    }
-  }, [cleanup, updateAudioLevel]);
+    await open();
+    const recorder = new MediaRecorder(streamRef.current!, { mimeType: getSupportedAudioMimeType() });
+    chunksRef.current = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    recorderRef.current = recorder;
+    recorder.start();
+  }, [open]);
 
   const stopRecording = useCallback((): Promise<Blob | null> => {
     return new Promise((resolve) => {
-      if (!mediaRecorderRef.current) {
-        setIsRecording(false);
+      const recorder = recorderRef.current;
+      if (!recorder || recorder.state === "inactive") {
         resolve(null);
         return;
       }
-      
-      const chunks: BlobPart[] = [];
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
+      recorder.onstop = () => {
+        recorderRef.current = null;
+        resolve(new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" }));
       };
-      
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunks, { type: mediaRecorderRef.current?.mimeType || "audio/webm" });
-        setIsRecording(false);
-        cleanup();
-        setAudioLevel(0);
-        resolve(blob);
-      };
-      
-      mediaRecorderRef.current.stop();
+      recorder.stop();
     });
-  }, [cleanup]);
+  }, []);
 
-  const cancelRecording = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.onstop = null;
-      mediaRecorderRef.current.ondataavailable = null;
+  /** Kaydı sonuç üretmeden bırakır, mikrofon açık kalır */
+  const discardRecording = useCallback(() => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      recorder.stop();
     }
-    setIsRecording(false);
-    cleanup();
-    setAudioLevel(0);
-  }, [cleanup]);
+    recorderRef.current = null;
+    chunksRef.current = [];
+  }, []);
 
-  return {
-    isRecording,
-    audioLevel,
-    startRecording,
-    stopRecording,
-    cancelRecording,
-  };
+  return useMemo(
+    () => ({ open, close, getLevel, startRecording, stopRecording, discardRecording }),
+    [open, close, getLevel, startRecording, stopRecording, discardRecording]
+  );
 }

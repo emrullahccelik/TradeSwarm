@@ -1,3 +1,5 @@
+import { apiPost } from "@/lib/api";
+
 export function getSupportedAudioMimeType(): string {
   const types = [
     "audio/webm",
@@ -33,4 +35,11 @@ export function getAudioFormat(mimeType: string): string {
   if (mimeType.includes("ogg")) return "ogg";
   if (mimeType.includes("wav")) return "wav";
   return "webm";
+}
+
+export async function transcribe(blob: Blob): Promise<string> {
+  const base64 = await blobToBase64(blob);
+  const format = getAudioFormat(blob.type || getSupportedAudioMimeType());
+  const response = await apiPost<{ text: string }>("/api/stt", { audio_base64: base64, format });
+  return (response.text || "").trim();
 }
