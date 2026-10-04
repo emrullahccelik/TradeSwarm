@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { MessageGroup, UIEvent, ActiveSubAgent } from "@/types";
+import { MessageGroup, UIEvent } from "@/types";
 import { fetchSSE } from "@/lib/api";
 
 const generateId = () => {
@@ -55,58 +55,66 @@ export function useChatStream() {
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
       const activeSubAgents = new Set<string>();
+      let finished = false;
+
+      const failStream = (text: string) => {
+        setIsGenerating(false);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id !== newMessageId
+              ? msg
+              : { ...msg, isStreaming: false, uiEvents: [...msg.uiEvents, { type: "error", text }] }
+          )
+        );
+      };
 
       try {
         await fetchSSE(
           "/api/chat",
           { message: text, session_id: sessionId },
           (event: UIEvent) => {
-            setMessages((prev) => {
-              const msgs = [...prev];
-              const lastMsg = msgs[msgs.length - 1];
-              if (!lastMsg || lastMsg.id !== newMessageId) return msgs;
+            if (event.type === "sub_agent_start" && event.run_id) {
+              activeSubAgents.add(event.run_id);
+            } else if (event.type === "sub_agent_end" && event.run_id) {
+              activeSubAgents.delete(event.run_id);
+            }
 
-              if (event.type === "sub_agent_start" && event.run_id) {
-                activeSubAgents.add(event.run_id);
-              } else if (event.type === "sub_agent_end" && event.run_id) {
-                activeSubAgents.delete(event.run_id);
-              }
+            // Alt ajan metinleri ana cevaba (ve TTS'e) eklenmez, sadece kartında gösterilir
+            const isSubAgentStream = !!event.parent_ids?.some((id) => activeSubAgents.has(id));
+            const mainText = event.type === "content" && !isSubAgentStream ? event.text || "" : "";
+            if (mainText) onContentChunk?.(mainText);
 
-              lastMsg.uiEvents.push(event);
+            if (event.type === "done" || event.type === "error") {
+              finished = true;
+              setIsGenerating(false);
+              if (event.type === "done") onDone?.();
+            }
 
-              if (event.type === "content") {
-                const isSubAgentStream = activeSubAgents.size > 0 && event.parent_ids && event.parent_ids.some(id => activeSubAgents.has(id));
-                
-                if (!isSubAgentStream && event.text) {
-                  lastMsg.content += event.text;
-                  onContentChunk?.(event.text);
-                }
-              }
-
-              if (event.type === "done" || event.type === "error") {
-                lastMsg.isStreaming = false;
-                setIsGenerating(false);
-                if (event.type === "done") onDone?.();
-              }
-
-              return msgs;
-            });
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id !== newMessageId
+                  ? msg
+                  : {
+                      ...msg,
+                      content: msg.content + mainText,
+                      uiEvents: [...msg.uiEvents, event],
+                      isStreaming: event.type === "done" || event.type === "error" ? false : msg.isStreaming,
+                    }
+              )
+            );
           },
           abortController.signal
         );
+        // Bağlantı "done" gelmeden kapandıysa arayüz kilitli kalmasın
+        if (!finished) failStream("Bağlantı yanıt tamamlanmadan kesildi.");
       } catch (err: any) {
         if (err.name !== "AbortError") {
           console.error("Chat error:", err);
-          setIsGenerating(false);
-          setMessages((prev) => {
-            const msgs = [...prev];
-            const lastMsg = msgs[msgs.length - 1];
-            if (lastMsg.id === newMessageId) {
-              lastMsg.isStreaming = false;
-              lastMsg.uiEvents.push({ type: "error", text: err.message });
-            }
-            return msgs;
-          });
+          failStream(err.message);
+        } else {
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id !== newMessageId ? msg : { ...msg, isStreaming: false }))
+          );
         }
       }
     },

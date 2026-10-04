@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Bot, User } from "lucide-react";
+import { AlertCircle, Bot, User } from "lucide-react";
 import { MessageGroup, UIEvent } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageContent } from "./message-content";
@@ -15,75 +15,170 @@ interface MessageBubbleProps {
   message: MessageGroup;
 }
 
+export interface ToolItem {
+  runId: string;
+  name: string;
+  status: "running" | "completed";
+}
+
+interface SubAgentItem {
+  kind: "agent";
+  runId: string;
+  name: string;
+  status: "running" | "completed";
+  reasoning: string;
+  content: string;
+  result: string;
+  tools: ToolItem[];
+}
+
+type TimelineItem =
+  | { kind: "reasoning"; text: string }
+  | { kind: "content"; text: string }
+  | { kind: "error"; text: string }
+  | ({ kind: "tool" } & ToolItem)
+  | SubAgentItem;
+
+// SSE event'lerini geliş sırasına göre gösterilecek bloklara dönüştürür
+function buildTimeline(uiEvents: UIEvent[], finalContent: string): TimelineItem[] {
+  const timeline: TimelineItem[] = [];
+  const agents: Record<string, SubAgentItem> = {};
+  const tools: Record<string, ToolItem> = {};
+  let hasMainContentEvents = false;
+
+  const appendText = (kind: "reasoning" | "content", text: string) => {
+    const last = timeline[timeline.length - 1];
+    if (last && last.kind === kind) {
+      last.text += text;
+    } else {
+      timeline.push({ kind, text });
+    }
+  };
+
+  for (const event of uiEvents) {
+    const agent = event.parent_ids?.map((id) => agents[id]).find(Boolean);
+
+    switch (event.type) {
+      case "sub_agent_start":
+        if (event.run_id) {
+          const item: SubAgentItem = {
+            kind: "agent",
+            runId: event.run_id,
+            name: event.tool || "",
+            status: "running",
+            reasoning: "",
+            content: "",
+            result: "",
+            tools: [],
+          };
+          agents[event.run_id] = item;
+          timeline.push(item);
+        }
+        break;
+      case "sub_agent_end":
+        if (event.run_id && agents[event.run_id]) {
+          agents[event.run_id].status = "completed";
+          agents[event.run_id].result = event.text || "";
+        }
+        break;
+      case "tool_start":
+        if (event.run_id && event.tool) {
+          const tool = { kind: "tool" as const, runId: event.run_id, name: event.tool, status: "running" as const };
+          tools[event.run_id] = tool;
+          if (agent) agent.tools.push(tool);
+          else timeline.push(tool);
+        }
+        break;
+      case "tool_end":
+        if (event.run_id && tools[event.run_id]) {
+          tools[event.run_id].status = "completed";
+        }
+        break;
+      case "reasoning":
+        if (!event.text) break;
+        if (agent) agent.reasoning += event.text;
+        else appendText("reasoning", event.text);
+        break;
+      case "content":
+        if (!event.text) break;
+        if (agent) {
+          agent.content += event.text;
+        } else {
+          hasMainContentEvents = true;
+          appendText("content", event.text);
+        }
+        break;
+      case "error":
+        timeline.push({ kind: "error", text: event.text || "Bilinmeyen hata" });
+        break;
+    }
+  }
+
+  // Geçmiş mesajlarda ana metin ui_state'te değil, content alanında saklanır
+  if (!hasMainContentEvents && finalContent) {
+    timeline.push({ kind: "content", text: finalContent });
+  }
+
+  return timeline;
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const { uiEvents = [], isStreaming } = message;
 
   const elements: React.ReactNode[] = [];
-  
+
   if (isUser) {
     elements.push(<MessageContent key="content" content={message.content} isUser={true} />);
   } else {
-    let currentReasoning = "";
-    let reasoningCount = 0;
-    
-    const toolStates: Record<string, { name: string; status: "running" | "completed" }> = {};
-    const subAgentStates: Record<string, { name: string; status: "running" | "completed"; content: string; innerTools: UIEvent[] }> = {};
-    
-    uiEvents.forEach((event, index) => {
-      if (event.type === "reasoning" && event.text) {
-        currentReasoning += event.text;
-        const nextEvent = uiEvents[index + 1];
-        if (!nextEvent || nextEvent.type !== "reasoning") {
+    const timeline = buildTimeline(uiEvents, message.content);
+
+    timeline.forEach((item, index) => {
+      const isLast = index === timeline.length - 1;
+      switch (item.kind) {
+        case "reasoning":
           elements.push(
-            <ThinkingBlock 
-              key={`reasoning-${reasoningCount++}`} 
-              content={currentReasoning} 
-              isStreaming={isStreaming && index === uiEvents.length - 1} 
+            <ThinkingBlock key={`reasoning-${index}`} content={item.text} isStreaming={isStreaming && isLast} />
+          );
+          break;
+        case "content":
+          elements.push(<MessageContent key={`content-${index}`} content={item.text} />);
+          break;
+        case "tool":
+          elements.push(
+            <div key={`tool-${item.runId}`}>
+              <ToolBadge toolName={item.name} status={item.status} runId={item.runId} />
+            </div>
+          );
+          break;
+        case "agent":
+          elements.push(
+            <SubAgentCard
+              key={`agent-${item.runId}`}
+              agentName={item.name}
+              status={item.status}
+              reasoning={item.reasoning}
+              content={item.result || item.content}
+              tools={item.tools}
+              runId={item.runId}
             />
           );
-          currentReasoning = "";
-        }
-      } else if (event.type === "tool_start" && event.tool && event.run_id && !event.parent_ids?.length) {
-        toolStates[event.run_id] = { name: event.tool, status: "running" };
-      } else if (event.type === "tool_end" && event.run_id && toolStates[event.run_id]) {
-        toolStates[event.run_id].status = "completed";
-      } else if (event.type === "sub_agent_start" && event.tool && event.run_id) {
-        subAgentStates[event.run_id] = { name: event.tool, status: "running", content: "", innerTools: [] };
-      } else if (event.type === "sub_agent_end" && event.run_id && subAgentStates[event.run_id]) {
-        subAgentStates[event.run_id].status = "completed";
-      } else if (event.parent_ids?.length && subAgentStates[event.parent_ids[0]]) {
-        const agentId = event.parent_ids[0];
-        if (event.type === "content" && event.text) {
-          subAgentStates[agentId].content += event.text;
-        } else {
-          subAgentStates[agentId].innerTools.push(event);
-        }
+          break;
+        case "error":
+          elements.push(
+            <div
+              key={`error-${index}`}
+              className="flex items-start gap-2 my-2 px-3 py-2 text-sm rounded-lg border border-destructive/30 bg-destructive/10 text-destructive"
+            >
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span className="break-words">{item.text}</span>
+            </div>
+          );
+          break;
       }
     });
 
-    Object.entries(toolStates).forEach(([runId, state]) => {
-      elements.push(<ToolBadge key={`tool-${runId}`} toolName={state.name} status={state.status} runId={runId} />);
-    });
-
-    Object.entries(subAgentStates).forEach(([runId, state]) => {
-      elements.push(
-        <SubAgentCard 
-          key={`agent-${runId}`} 
-          agentName={state.name} 
-          status={state.status} 
-          content={state.content}
-          innerTools={state.innerTools}
-          runId={runId}
-        />
-      );
-    });
-
-    if (message.content) {
-      elements.push(<MessageContent key="main-content" content={message.content} />);
-    }
-
-    if (isStreaming && !message.content && elements.length === 0) {
+    if (isStreaming && elements.length === 0) {
       elements.push(
         <div key="typing" className="flex space-x-1 items-center h-6">
           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]" />

@@ -89,6 +89,13 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
+background_tasks = set()
+
+async def save_partial_response(session_id: str, content: str, ui_state: list):
+    async with AsyncSessionLocal() as db:
+        db.add(ChatMessage(session_id=session_id, role="assistant", content=content, ui_state=ui_state))
+        await db.commit()
+
 async def generate_chat_events(message: str, session_id: str, db):
     """
     Kullanıcı mesajını alır, LangChain'in astream_events API'si ile çalıştırır.
@@ -161,48 +168,52 @@ async def generate_chat_events(message: str, session_id: str, db):
                 yield f"data: {json.dumps(payload)}\n\n"
                 
             elif kind == "on_chat_model_stream":
-                # Eğer bu stream'in ebeveynlerinden biri aktif bir alt ajansa, sızmasını engelle!
+                # Alt ajan stream'leri ana cevaba karışmasın diye alt ajanın run_id'si ile etiketlenir
                 parent_ids = event.get("parent_ids", [])
-                if any(pid in active_sub_agents for pid in parent_ids):
-                    continue
+                sub_agent_id = next((pid for pid in parent_ids if pid in active_sub_agents), None)
                 
                 chunk = event["data"].get("chunk")
+                if not chunk:
+                    continue
                 
-                if chunk:
-                    if hasattr(chunk, "content_blocks") and isinstance(chunk.content_blocks, list):
-                        for block in chunk.content_blocks:
-                            if isinstance(block, dict) and block.get("type") == "reasoning":
-                                reasoning_text = block.get("reasoning")
-                                if reasoning_text:
-                                    payload = {"type": "reasoning", "text": reasoning_text}
-                                    ui_state.append(payload)
-                                    yield f"data: {json.dumps(payload)}\n\n"
-                    
-                    elif isinstance(chunk.content, list):
-                        for item in chunk.content:
-                            if isinstance(item, dict) and item.get("type") == "reasoning":
-                                reasoning_text = item.get("reasoning")
-                                if reasoning_text:
-                                    payload = {"type": "reasoning", "text": reasoning_text}
-                                    ui_state.append(payload)
-                                    yield f"data: {json.dumps(payload)}\n\n"
-                    
-                    reasoning_content = chunk.additional_kwargs.get("reasoning") or chunk.additional_kwargs.get("reasoning_content")
-                    if reasoning_content:
-                        payload = {"type": "reasoning", "text": reasoning_content}
-                        ui_state.append(payload)
-                        yield f"data: {json.dumps(payload)}\n\n"
-                    
-                    if isinstance(chunk.content, str) and chunk.content:
-                        payload = {"type": "content", "text": chunk.content}
-                        assistant_content += chunk.content
-                        yield f"data: {json.dumps(payload)}\n\n"
-                    elif isinstance(chunk.content, list):
-                        for item in chunk.content:
-                            if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
-                                payload = {"type": "content", "text": item.get("text")}
-                                assistant_content += item.get("text")
-                                yield f"data: {json.dumps(payload)}\n\n"
+                reasoning_texts = []
+                content_texts = []
+                
+                if hasattr(chunk, "content_blocks") and isinstance(chunk.content_blocks, list):
+                    for block in chunk.content_blocks:
+                        if isinstance(block, dict) and block.get("type") == "reasoning" and block.get("reasoning"):
+                            reasoning_texts.append(block.get("reasoning"))
+                elif isinstance(chunk.content, list):
+                    for item in chunk.content:
+                        if isinstance(item, dict) and item.get("type") == "reasoning" and item.get("reasoning"):
+                            reasoning_texts.append(item.get("reasoning"))
+                
+                reasoning_content = chunk.additional_kwargs.get("reasoning") or chunk.additional_kwargs.get("reasoning_content")
+                if reasoning_content:
+                    reasoning_texts.append(reasoning_content)
+                
+                if isinstance(chunk.content, str) and chunk.content:
+                    content_texts.append(chunk.content)
+                elif isinstance(chunk.content, list):
+                    for item in chunk.content:
+                        if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
+                            content_texts.append(item.get("text"))
+                
+                for text in reasoning_texts:
+                    payload = {"type": "reasoning", "text": text}
+                    if sub_agent_id:
+                        payload["parent_ids"] = [sub_agent_id]
+                    ui_state.append(payload)
+                    yield f"data: {json.dumps(payload)}\n\n"
+                
+                for text in content_texts:
+                    if sub_agent_id:
+                        # Alt ajan metni canlı gösterilir; kalıcı hali sub_agent_end içindeki çıktıdır
+                        payload = {"type": "content", "text": text, "parent_ids": [sub_agent_id]}
+                    else:
+                        payload = {"type": "content", "text": text}
+                        assistant_content += text
+                    yield f"data: {json.dumps(payload)}\n\n"
 
         # Asistan yanıtını DB'ye kaydet
         assistant_msg = ChatMessage(
@@ -226,10 +237,11 @@ async def generate_chat_events(message: str, session_id: str, db):
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         
     except asyncio.CancelledError:
-        # İptal durumunda o ana kadarki cevabı kaydet
-        assistant_msg = ChatMessage(session_id=session_id, role="assistant", content=assistant_content, ui_state=ui_state)
-        db.add(assistant_msg)
-        await db.commit()
+        # İptal durumunda o ana kadarki cevabı kaydet. İptal edilen istek içinde await edilen her şey de
+        # iptal edileceği için kayıt, kendi DB oturumuyla bağımsız bir task'ta yapılır.
+        task = asyncio.create_task(save_partial_response(session_id, assistant_content, ui_state))
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
         raise
     except Exception as e:
         error_payload = {"type": "error", "text": str(e)}

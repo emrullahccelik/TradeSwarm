@@ -4,14 +4,16 @@ import { Bot, Loader2, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { MessageContent } from "./message-content";
 import { ToolBadge } from "./tool-badge";
-import { UIEvent } from "@/types";
+import { ThinkingBlock } from "./thinking-block";
+import type { ToolItem } from "./message-bubble";
 import { cn } from "@/lib/utils";
 
 interface SubAgentCardProps {
   agentName: string;
   status: "running" | "completed";
+  reasoning?: string;
   content?: string;
-  innerTools?: UIEvent[];
+  tools?: ToolItem[];
   runId?: string;
 }
 
@@ -21,18 +23,9 @@ const AGENT_NAMES: Record<string, string> = {
   ask_market_analyzer: "Piyasa Analisti",
 };
 
-export function SubAgentCard({ agentName, status, content, innerTools = [] }: SubAgentCardProps) {
+export function SubAgentCard({ agentName, status, reasoning, content, tools = [] }: SubAgentCardProps) {
   const displayName = AGENT_NAMES[agentName] || agentName;
   const isRunning = status === "running";
-
-  const tools = innerTools.reduce((acc, event) => {
-    if (event.type === "tool_start" && event.tool && event.run_id) {
-      acc[event.run_id] = { name: event.tool, status: "running" };
-    } else if (event.type === "tool_end" && event.run_id && acc[event.run_id]) {
-      acc[event.run_id].status = "completed";
-    }
-    return acc;
-  }, {} as Record<string, { name: string; status: "running" | "completed" }>);
 
   return (
     <motion.div
@@ -54,18 +47,27 @@ export function SubAgentCard({ agentName, status, content, innerTools = [] }: Su
       </div>
       
       <div className="p-4 flex flex-col gap-2">
-        {Object.entries(tools).length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
-            {Object.entries(tools).map(([runId, tool]) => (
-              <ToolBadge key={runId} toolName={tool.name} status={tool.status} runId={runId} />
+        {reasoning && <ThinkingBlock content={reasoning} isStreaming={isRunning && !content} />}
+
+        {tools.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {tools.map((tool) => (
+              <ToolBadge key={tool.runId} toolName={tool.name} status={tool.status} runId={tool.runId} />
             ))}
           </div>
         )}
-        
-        {content && (
+
+        {content ? (
           <div className="text-sm">
             <MessageContent content={content} />
           </div>
+        ) : (
+          isRunning && (
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+              Analiz ediliyor...
+            </div>
+          )
         )}
       </div>
     </motion.div>
