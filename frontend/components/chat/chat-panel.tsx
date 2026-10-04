@@ -7,6 +7,8 @@ import { useChatStream } from "@/hooks/use-chat-stream";
 import { VoiceChatOverlay } from "@/components/voice/voice-chat-overlay";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceChat } from "@/hooks/use-voice-chat";
+import { apiGet, apiPost } from "@/lib/api";
+import type { Session } from "@/types";
 
 interface ChatPanelProps {
   sessionId?: string;
@@ -23,10 +25,7 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPane
     if (!sessionId) {
       clearMessages();
     } else if (token && !isGenerating) {
-      fetch(`/api/sessions/${sessionId}/messages`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(res => res.json())
+      apiGet<any[]>(`/api/sessions/${sessionId}/messages`)
       .then(data => {
          if (Array.isArray(data)) {
            setMessages(data.map((m: any) => ({
@@ -56,16 +55,9 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPane
 
     if (!currentSessionId) {
       try {
-        const res = await fetch("/api/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: text.slice(0, 30) }),
-        });
-        if (res.ok) {
-          const session = await res.json();
-          currentSessionId = session.id;
-          onSessionUpdate?.(session.id, session.title);
-        }
+        const session = await apiPost<Session>("/api/sessions", { title: text.slice(0, 30) });
+        currentSessionId = session.id;
+        onSessionUpdate?.(session.id, session.title);
       } catch (error) {
         console.error("Failed to create session", error);
         return;

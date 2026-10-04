@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { ChatProvider, useChatContext } from "@/hooks/use-chat-context";
+import { apiDelete } from "@/lib/api";
 
 function ChatLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -24,12 +25,7 @@ function ChatLayoutContent({ children }: { children: React.ReactNode }) {
 
   const handleDeleteSession = async (id: string) => {
     try {
-      await fetch(`/api/sessions/${id}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("tradeswarm_jwt")}`
-        }
-      });
+      await apiDelete(`/api/sessions/${id}`);
       await refreshSessions();
       if (activeSessionId === id) {
         setActiveSession(null);

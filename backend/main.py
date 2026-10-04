@@ -247,7 +247,7 @@ async def generate_chat_events(message: str, session_id: str, db):
         error_payload = {"type": "error", "text": str(e)}
         yield f"data: {json.dumps(error_payload)}\n\n"
 
-@app.post("/api/chat")
+@app.post("/api/chat", dependencies=[Depends(verify_jwt)])
 async def chat_endpoint(request: ChatRequest, db = Depends(get_db)):
     """
     Arayüzden gelen POST isteklerini karşılar ve StreamingResponse ile Server-Sent Events (SSE) yayınını başlatır.
@@ -266,12 +266,12 @@ async def chat_endpoint(request: ChatRequest, db = Depends(get_db)):
 async def health_check():
     return {"status": "TradeSwarm Backend is running perfectly!"}
 
-@app.get("/api/sessions")
+@app.get("/api/sessions", dependencies=[Depends(verify_jwt)])
 async def get_sessions(db = Depends(get_db)):
     result = await db.execute(select(ChatSession).order_by(ChatSession.updated_at.desc()))
     return result.scalars().all()
 
-@app.post("/api/sessions")
+@app.post("/api/sessions", dependencies=[Depends(verify_jwt)])
 async def create_session(session_data: SessionCreate, db = Depends(get_db)):
     new_sess = ChatSession(title=session_data.title)
     db.add(new_sess)
@@ -279,7 +279,7 @@ async def create_session(session_data: SessionCreate, db = Depends(get_db)):
     await db.refresh(new_sess)
     return new_sess
 
-@app.get("/api/sessions/{session_id}/messages")
+@app.get("/api/sessions/{session_id}/messages", dependencies=[Depends(verify_jwt)])
 async def get_messages(session_id: str, db = Depends(get_db)):
     result = await db.execute(
         select(ChatMessage)
@@ -288,7 +288,7 @@ async def get_messages(session_id: str, db = Depends(get_db)):
     )
     return result.scalars().all()
 
-@app.delete("/api/sessions/{session_id}")
+@app.delete("/api/sessions/{session_id}", dependencies=[Depends(verify_jwt)])
 async def delete_session(session_id: str, db = Depends(get_db)):
     session = await db.execute(select(ChatSession).where(ChatSession.id == session_id))
     sess_obj = session.scalar_one_or_none()
@@ -303,7 +303,7 @@ class STTRequest(BaseModel):
 
 import aiohttp
 
-@app.post("/api/stt")
+@app.post("/api/stt", dependencies=[Depends(verify_jwt)])
 async def process_stt(req: STTRequest):
     if not STT_API_KEY:
         raise HTTPException(status_code=500, detail="STT_API_KEY eksik")
@@ -334,7 +334,7 @@ async def process_stt(req: STTRequest):
 class TTSRequest(BaseModel):
     text: str
 
-@app.post("/api/tts")
+@app.post("/api/tts", dependencies=[Depends(verify_jwt)])
 async def process_tts(req: TTSRequest):
     if not STT_API_KEY:
         raise HTTPException(status_code=500, detail="API Key eksik")

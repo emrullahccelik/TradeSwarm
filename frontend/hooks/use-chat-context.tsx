@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import type { Session } from "@/types";
+import { apiGet } from "@/lib/api";
 
 interface ChatContextType {
   activeSessionId: string | null;
@@ -21,11 +22,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const res = await fetch("/api/sessions");
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-      }
+      setSessions(await apiGet<Session[]>("/api/sessions"));
     } catch (error) {
       console.error("Failed to fetch sessions", error);
     }
