@@ -74,7 +74,7 @@ async def notify_user(message: str) -> str:
     }
     
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
             async with session.post(url, json=payload) as response:
                 if response.status == 200:
                     return "Telegram bildirimi başarıyla gönderildi."

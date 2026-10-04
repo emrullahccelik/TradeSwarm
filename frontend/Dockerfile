@@ -1,11 +1,21 @@
-FROM nginx:alpine
+FROM node:22-alpine AS builder
 
-# Copy the vanilla JS frontend file
-COPY index.html /usr/share/nginx/html/index.html
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
 
-# Copy the Nginx template for envsubst
-COPY default.conf.template /etc/nginx/templates/default.conf.template
+COPY . .
+RUN npm run build
 
-EXPOSE 80
+FROM node:22-alpine AS runner
+WORKDIR /app
 
-CMD ["nginx", "-g", "daemon off;"]
+ENV NODE_ENV=production
+ENV HOSTNAME="0.0.0.0"
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+EXPOSE 3000
+CMD ["node", "server.js"]

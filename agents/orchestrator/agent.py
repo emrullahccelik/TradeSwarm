@@ -14,6 +14,7 @@ def create_orchestrator_agent():
         api_key=ORCHESTRATOR_API_KEY,
         base_url=ORCHESTRATOR_BASE_URL,
         temperature=0.2,
+        streaming=True,
         model_kwargs={"extra_body": {"include_reasoning": True}}
     )
 

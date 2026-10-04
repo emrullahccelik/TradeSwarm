@@ -219,3 +219,8 @@ __marimo__/
 
 # Test scripts
 test/
+docs/
+frontend/node_modules/
+frontend/.next/
+frontend/.env*
+
