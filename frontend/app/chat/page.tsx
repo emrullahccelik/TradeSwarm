@@ -4,7 +4,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { useChatContext } from "@/hooks/use-chat-context";
 
 export default function ChatPage() {
-  const { activeSessionId, activeSessionTitle, createAndSetSession } = useChatContext();
+  const { activeSessionId, activeSessionTitle, createAndSetSession, refreshSessions } = useChatContext();
 
   const handleSessionUpdate = (id: string, title: string) => {
     if (!activeSessionId) {
@@ -18,6 +18,7 @@ export default function ChatPage() {
         sessionId={activeSessionId || undefined}
         sessionTitle={activeSessionTitle || undefined}
         onSessionUpdate={handleSessionUpdate}
+        onResponseDone={refreshSessions}
       />
     </div>
   );

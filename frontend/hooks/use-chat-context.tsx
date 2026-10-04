@@ -44,6 +44,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [sessions]);
 
+  // Başlık backend'de değişebildiği için (otomatik başlık, update_chat_title) aktif başlığı listeden güncelle
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const session = sessions.find((s) => s.id === activeSessionId);
+    if (session) setActiveSessionTitleState(session.title);
+  }, [sessions, activeSessionId]);
+
   const createAndSetSession = useCallback((id: string, title: string) => {
     setActiveSessionIdState(id);
     setActiveSessionTitleState(title);

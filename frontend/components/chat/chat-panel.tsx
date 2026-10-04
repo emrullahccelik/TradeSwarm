@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ChatHeader } from "./chat-header";
 import { ChatMessages } from "./chat-messages";
 import { ChatInput } from "./chat-input";
@@ -14,9 +14,10 @@ interface ChatPanelProps {
   sessionId?: string;
   sessionTitle?: string;
   onSessionUpdate?: (id: string, title: string) => void;
+  onResponseDone?: () => void;
 }
 
-export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPanelProps) {
+export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate, onResponseDone }: ChatPanelProps) {
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const { messages, setMessages, clearMessages, isGenerating, sendMessage, stopGeneration } = useChatStream();
   const { token } = useAuth();
@@ -40,6 +41,21 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPane
     }
   }, [sessionId, token, clearMessages, setMessages]);
 
+  // Cevap bitince backend başlığı üretmiş/güncellemiş olur; sohbet listesi yenilenir
+  const sendAndRefresh = useCallback(
+    (text: string, sid: string, onDone?: () => void, onContentChunk?: (chunk: string) => void) =>
+      sendMessage(
+        text,
+        sid,
+        () => {
+          onDone?.();
+          onResponseDone?.();
+        },
+        onContentChunk
+      ),
+    [sendMessage, onResponseDone]
+  );
+
   const {
     state: voiceState,
     audioLevel,
@@ -48,14 +64,15 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPane
     startVoiceChat,
     stopVoiceChat,
     stopRecording
-  } = useVoiceChat(sessionId || "", sendMessage as any, token);
+  } = useVoiceChat(sessionId || "", sendAndRefresh, token);
 
   const handleSendMessage = async (text: string) => {
     let currentSessionId = sessionId;
 
     if (!currentSessionId) {
       try {
-        const session = await apiPost<Session>("/api/sessions", { title: text.slice(0, 30) });
+        // Başlık verilmez: backend ilk cevaptan sonra LLM ile başlık üretir
+        const session = await apiPost<Session>("/api/sessions", {});
         currentSessionId = session.id;
         onSessionUpdate?.(session.id, session.title);
       } catch (error) {
@@ -65,7 +82,7 @@ export function ChatPanel({ sessionId, sessionTitle, onSessionUpdate }: ChatPane
     }
 
     if (currentSessionId) {
-      sendMessage(text, currentSessionId);
+      sendAndRefresh(text, currentSessionId);
     }
   };
 

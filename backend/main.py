@@ -76,10 +76,14 @@ async def generate_title_from_message(user_message: str, assistant_message: str)
         )
         prompt = f"Kullanıcı mesajı ve Asistanın cevabına dayanarak bu sohbet için 3-5 kelimelik kısa, öz ve ilgi çekici bir başlık oluştur. Sadece başlığı yaz, tırnak işareti kullanma.\n\nKullanıcı: {user_message}\n\nAsistan: {assistant_message}"
         response = await llm.ainvoke(prompt)
-        title = response.content.strip().replace('"', '')
-        return title
-    except Exception as e:
-        return user_message[:30] + "..." if len(user_message) > 30 else user_message
+        # Küçük modeller bazen başlık yerine uzun metin döndürür: ilk satırı al ve kısalt
+        lines = response.content.strip().replace('"', '').splitlines()
+        title = lines[0].strip(" #*") if lines else ""
+        if title:
+            return title[:60]
+    except Exception:
+        pass
+    return user_message[:30] + "..." if len(user_message) > 30 else user_message
 
 @app.on_event("startup")
 async def on_startup():
