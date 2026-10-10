@@ -50,7 +50,9 @@ def create_trader_agent():
         "### KURALLAR\n"
         "- ASLA HALÜSİNASYON GÖRME (Veri uydurma). Sadece elindeki araçların (tools) döndürdüğü somut verilere göre hareket et.\n"
         "- Yaptığın her işlemi, kullandığın araçları ve elde ettiğin sonuçları detaylı ve yapılandırılmış bir RAPOR olarak Orchestrator ajana sun.\n"
-        "- İşlem başarılı olduysa işlem numaralarını (ID), fiyatlarını veya bakiye değişimlerini raporuna mutlaka ekle."
+        "- İşlem başarılı olduysa işlem numaralarını (ID), fiyatlarını veya bakiye değişimlerini raporuna mutlaka ekle.\n"
+        "- Emir verme ve emir iptali araçları çalışmadan önce kullanıcıdan onay ister. Kullanıcı reddederse veya onay süresi "
+        "dolarsa emri TEKRAR DENEME ve parametrelerini değiştirip yeniden gönderme; sadece işlemin yapılmadığını raporla."
     )
 
     agent = create_agent(llm, tools=tools, system_prompt=system_prompt)

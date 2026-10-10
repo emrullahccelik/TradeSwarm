@@ -20,8 +20,13 @@ def test_average_fill_price_is_quantity_weighted():
     assert tools.average_fill_price(fills) == "107.5"
 
 
+@pytest.fixture
+def approve_all(monkeypatch):
+    monkeypatch.setattr(tools, "request_approval", lambda action, details: None)
+
+
 @pytest.mark.parametrize("fills", [None, []])
-def test_market_order_without_fills_does_not_crash(monkeypatch, fills):
+def test_market_order_without_fills_does_not_crash(monkeypatch, approve_all, fills):
     client = MagicMock()
     client.order_market_buy.return_value = {"orderId": 7, "status": "FILLED", "fills": fills}
     monkeypatch.setattr(tools, "get_binance_client", lambda: client)
@@ -42,3 +47,30 @@ def test_order_tools_refuse_when_trading_disabled(monkeypatch):
 
     assert result == tools.TRADING_DISABLED_MSG
     client.order_market_buy.assert_not_called()
+
+
+@pytest.mark.parametrize("tool, args, client_method", [
+    (tools.create_market_order, {"symbol": "btcusdt", "side": "buy", "quantity": 0.5}, "order_market_buy"),
+    (tools.create_limit_order, {"symbol": "btcusdt", "side": "sell", "quantity": 1, "price": 70000}, "create_order"),
+    (tools.create_oco_order, {"symbol": "btcusdt", "side": "sell", "quantity": 1, "price": 75000,
+                              "stop_price": 65000, "stop_limit_price": 64900}, "create_oco_order"),
+    (tools.cancel_open_order, {"symbol": "btcusdt", "order_id": 42}, "cancel_order"),
+])
+def test_order_tools_do_nothing_when_user_refuses(monkeypatch, tool, args, client_method):
+    requested = []
+
+    def refuse(action, details):
+        requested.append((action, details))
+        return "İşlem yapılmadı: kullanıcı bu emri REDDETTİ."
+
+    monkeypatch.setattr(tools, "request_approval", refuse)
+    client = MagicMock()
+    monkeypatch.setattr(tools, "get_binance_client", lambda: client)
+
+    result = tool.invoke(args)
+
+    assert "REDDETTİ" in result
+    getattr(client, client_method).assert_not_called()
+    # Kullanıcıya gösterilen detaylar Binance'e gidecek normalize edilmiş değerlerdir
+    assert requested[0][0] == tool.name
+    assert requested[0][1]["symbol"] == "BTCUSDT"

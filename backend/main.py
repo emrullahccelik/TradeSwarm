@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import asyncio
 import json
+import uuid
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -8,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from langchain.chat_models import init_chat_model
 from sqlalchemy.future import select
 
-from backend import auth, voice
+from backend import approvals, auth, voice
 from backend.auth import verify_jwt
 from backend.agents.orchestrator.agent import create_orchestrator_agent
 from backend.config import TITLE_MODEL, TITLE_API_KEY, TITLE_BASE_URL, CORS_ORIGINS
@@ -24,6 +25,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="TradeSwarm AI Backend", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(voice.router)
+app.include_router(approvals.router)
 
 if CORS_ORIGINS:
     app.add_middleware(
@@ -76,6 +78,8 @@ async def generate_chat_events(message: str, session_id: str, db):
     assistant_content = ""
     ui_state = []
     active_sub_agents = set()
+    # Bu isteğin emir onaylarını gruplar; istek biterse veya iptal edilirse bekleyen onaylar reddedilir
+    request_id = str(uuid.uuid4())
 
     try:
         # Kullanıcı mesajını DB'ye kaydet
@@ -94,7 +98,7 @@ async def generate_chat_events(message: str, session_id: str, db):
         formatted_messages = [{"role": m.role, "content": m.content} for m in past_msgs if m.content]
 
         # thread_id, update_chat_title aracının hangi sohbeti güncelleyeceğini bilmesi için geçirilir
-        config = {"configurable": {"thread_id": session_id}}
+        config = {"configurable": {"thread_id": session_id, "request_id": request_id}}
         
         async for event in orchestrator.astream_events(
             {"messages": formatted_messages},
@@ -133,6 +137,12 @@ async def generate_chat_events(message: str, session_id: str, db):
                     ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
+            elif kind == "on_custom_event" and name in ("approval_required", "approval_resolved"):
+                # Emir onay kartı: alt ajanın içinden gelse de kullanıcı görsün diye ana akışta gösterilir
+                payload = {"type": name, **event["data"]}
+                ui_state.append(payload)
+                yield f"data: {json.dumps(payload)}\n\n"
+
             elif kind == "on_chat_model_stream":
                 # Alt ajan stream'leri ana cevaba karışmasın diye alt ajanın run_id'si ile etiketlenir
                 parent_ids = event.get("parent_ids", [])
@@ -214,6 +224,8 @@ async def generate_chat_events(message: str, session_id: str, db):
     except Exception as e:
         error_payload = {"type": "error", "text": str(e)}
         yield f"data: {json.dumps(error_payload)}\n\n"
+    finally:
+        approvals.cancel_request(request_id)
 
 @app.post("/api/chat", dependencies=[Depends(verify_jwt)])
 async def chat_endpoint(request: ChatRequest, db = Depends(get_db)):

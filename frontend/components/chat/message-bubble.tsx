@@ -2,12 +2,13 @@
 
 import { motion } from "framer-motion";
 import { AlertCircle, Bot, User } from "lucide-react";
-import { MessageGroup, UIEvent } from "@/types";
+import { ApprovalStatus, MessageGroup, UIEvent } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageContent } from "./message-content";
 import { ThinkingBlock } from "./thinking-block";
 import { ToolBadge } from "./tool-badge";
 import { SubAgentCard } from "./sub-agent-card";
+import { ApprovalCard } from "./approval-card";
 import { MessageActions } from "./message-actions";
 import { cn } from "@/lib/utils";
 
@@ -32,18 +33,29 @@ interface SubAgentItem {
   tools: ToolItem[];
 }
 
+interface ApprovalItem {
+  kind: "approval";
+  approvalId: string;
+  action: string;
+  details: Record<string, string | number>;
+  status: ApprovalStatus;
+  timeout?: number;
+}
+
 type TimelineItem =
   | { kind: "reasoning"; text: string }
   | { kind: "content"; text: string }
   | { kind: "error"; text: string }
   | ({ kind: "tool" } & ToolItem)
-  | SubAgentItem;
+  | SubAgentItem
+  | ApprovalItem;
 
 // SSE event'lerini geliş sırasına göre gösterilecek bloklara dönüştürür
-function buildTimeline(uiEvents: UIEvent[], finalContent: string): TimelineItem[] {
+function buildTimeline(uiEvents: UIEvent[], finalContent: string, isStreaming: boolean): TimelineItem[] {
   const timeline: TimelineItem[] = [];
   const agents: Record<string, SubAgentItem> = {};
   const tools: Record<string, ToolItem> = {};
+  const approvals: Record<string, ApprovalItem> = {};
   let hasMainContentEvents = false;
 
   const appendText = (kind: "reasoning" | "content", text: string) => {
@@ -108,9 +120,36 @@ function buildTimeline(uiEvents: UIEvent[], finalContent: string): TimelineItem[
           appendText("content", event.text);
         }
         break;
+      case "approval_required":
+        // Alt ajanın içinden gelse de gözden kaçmaması için kartın içine değil ana akışa eklenir
+        if (event.approval_id) {
+          const item: ApprovalItem = {
+            kind: "approval",
+            approvalId: event.approval_id,
+            action: event.action || "",
+            details: event.details || {},
+            status: "pending",
+            timeout: event.timeout,
+          };
+          approvals[event.approval_id] = item;
+          timeline.push(item);
+        }
+        break;
+      case "approval_resolved":
+        if (event.approval_id && approvals[event.approval_id] && event.status) {
+          approvals[event.approval_id].status = event.status;
+        }
+        break;
       case "error":
         timeline.push({ kind: "error", text: event.text || "Bilinmeyen hata" });
         break;
+    }
+  }
+
+  // Akış sonuç gelmeden bittiyse (ör. istek iptal edildi) backend bekleyen onayı zaten reddetmiştir
+  if (!isStreaming) {
+    for (const item of Object.values(approvals)) {
+      if (item.status === "pending") item.status = "cancelled";
     }
   }
 
@@ -131,7 +170,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   if (isUser) {
     elements.push(<MessageContent key="content" content={message.content} isUser={true} />);
   } else {
-    const timeline = buildTimeline(uiEvents, message.content);
+    const timeline = buildTimeline(uiEvents, message.content, !!isStreaming);
 
     timeline.forEach((item, index) => {
       const isLast = index === timeline.length - 1;
@@ -161,6 +200,18 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               content={item.result || item.content}
               tools={item.tools}
               runId={item.runId}
+            />
+          );
+          break;
+        case "approval":
+          elements.push(
+            <ApprovalCard
+              key={`approval-${item.approvalId}`}
+              approvalId={item.approvalId}
+              action={item.action}
+              details={item.details}
+              status={item.status}
+              timeout={item.timeout}
             />
           );
           break;

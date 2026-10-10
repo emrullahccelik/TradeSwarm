@@ -32,14 +32,24 @@ export interface UIEvent {
     | "sub_agent_end"
     | "done"
     | "error"
-    | "audio";
+    | "audio"
+    | "approval_required"
+    | "approval_resolved";
   text?: string;
   tool?: string;
   run_id?: string;
   parent_ids?: string[];
   audio?: string;
   index?: number;
+  // Emir onayı (approval_required / approval_resolved)
+  approval_id?: string;
+  action?: string;
+  details?: Record<string, string | number>;
+  timeout?: number;
+  status?: ApprovalStatus;
 }
+
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired" | "cancelled";
 
 // ==========================================
 // VOICE CHAT STATE MACHINE

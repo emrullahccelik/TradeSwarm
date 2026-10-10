@@ -13,7 +13,7 @@
 
 TradeSwarm is a **multi-agent AI system** for cryptocurrency trading, market research, and portfolio analysis. An Orchestrator agent interprets natural-language requests (typed or spoken), delegates work to specialized sub-agents, and streams every step — reasoning, tool calls, sub-agent output and the final answer — to a Next.js interface in real time.
 
-> **Safe by design:** the Trader agent executes orders on the **Binance Spot Testnet**, so no real funds are ever at risk. Set `TRADING_ENABLED=false` to make it read-only.
+> **Safe by design:** the Trader agent executes orders on the **Binance Spot Testnet**, so no real funds are ever at risk. Every order and cancellation also waits for your explicit approval in the chat (human-in-the-loop). Set `TRADING_ENABLED=false` to make it read-only.
 
 This project focuses on **AI agent orchestration, real-time streaming (SSE), voice interfaces, and full-stack development.**
 
@@ -49,6 +49,7 @@ Speak into the composer, confirm with ✓, and edit the transcript before sendin
 *   **True Real-Time Streaming UI (Server-Sent Events):** The backend streams execution traces, intermediate tool calls, agent reasoning steps, and final tokens to the client asynchronously. The Next.js frontend reconstructs this state tree dynamically in real-time.
 *   **Modern Frontend:** Built with **Next.js 15 (App Router)**, React 19, and Tailwind CSS v3. Uses a modular component architecture with **shadcn/ui**, `framer-motion` for smooth layout transitions, and comprehensive state management via custom React hooks.
 *   **Persistent Chat History:** PostgreSQL (async SQLAlchemy) stores messages, UI events and sessions, so conversations — including tool calls and sub-agent cards — are fully restored after a reload or restart, and chats get an LLM-generated title.
+*   **Human-in-the-Loop Order Approval:** Before the Trader places or cancels an order, the tool pauses and an approval card with the exact symbol, side, quantity and prices appears in the chat. Nothing is sent to the exchange unless you click *Approve*; rejecting, letting the 120-second window expire, or stopping the request leaves the account untouched.
 *   **Secured API:** All endpoints except login are protected with JWT authentication.
 
 ## 🤖 Agents & Tools
@@ -62,7 +63,7 @@ TradeSwarm uses a **supervisor–worker** hierarchy: the Orchestrator talks to t
 | 🔍 **Researcher** | News, project fundamentals and macro developments from the web | Tavily | `SUB_AGENT_MODEL` | 2 |
 | 📈 **Market Analyzer** | Prices, market data, exchange listings, trends and corporate holdings | CoinGecko | `SUB_AGENT_MODEL` | 8 |
 
-⚠️ marks tools that change state (orders, chat title) or send something outside the app.
+⚠️ marks tools that change state (orders, chat title) or send something outside the app. 🛡️ marks tools that only run after you approve them in the chat.
 
 <details>
 <summary><strong>🧠 Orchestrator</strong> — 5 tools</summary>
@@ -89,10 +90,10 @@ TradeSwarm uses a **supervisor–worker** hierarchy: the Orchestrator talks to t
 | `get_account_balance(asset)` | Account balances, optionally for a single asset |
 | `get_my_trades(symbol, limit)` | Your past trades for a pair |
 | `get_open_orders(symbol)` | Open orders, optionally filtered by pair |
-| `create_market_order(symbol, side, quantity)` ⚠️ | Places a market BUY/SELL order |
-| `create_limit_order(symbol, side, quantity, price)` ⚠️ | Places a limit order at a given price |
-| `create_oco_order(symbol, side, quantity, price, stop_price, stop_limit_price)` ⚠️ | Places an OCO order (take-profit + stop-loss together) |
-| `cancel_open_order(symbol, order_id)` ⚠️ | Cancels an open order by ID |
+| `create_market_order(symbol, side, quantity)` ⚠️ 🛡️ | Places a market BUY/SELL order |
+| `create_limit_order(symbol, side, quantity, price)` ⚠️ 🛡️ | Places a limit order at a given price |
+| `create_oco_order(symbol, side, quantity, price, stop_price, stop_limit_price)` ⚠️ 🛡️ | Places an OCO order (take-profit + stop-loss together) |
+| `cancel_open_order(symbol, order_id)` ⚠️ 🛡️ | Cancels an open order by ID |
 
 </details>
 
@@ -246,4 +247,5 @@ One of the main engineering challenges in this project was mapping LangGraph's d
 2. Every event carries its `run_id` and `parent_ids`; text streamed by a sub-agent is tagged with that sub-agent's run id so it never leaks into the main answer.
 3. The frontend turns the event list into a **chronological timeline**: reasoning blocks, tool badges, sub-agent cards and answer text appear in the order they happened. Events whose `parent_ids` contain a running sub-agent are attached to that agent's card.
 4. The same event list is persisted with each message, so a reloaded conversation renders exactly like the live one.
-5. The stream is resilient: if the connection drops before `done`, the UI unlocks and shows an error instead of hanging, and a cancelled request still saves the partial answer.
+5. **Order approval:** order tools run inside the Trader's worker thread, several layers below the request. They publish an `approval_required` custom event (which `astream_events` surfaces to the SSE stream like any other event) and block until `POST /api/approvals/{id}` delivers the user's decision. An `approval_resolved` event records the outcome, and when a request ends or is cancelled, its pending approvals are rejected so a tool can never be left waiting. Pending approvals live in process memory, so the backend runs as a single worker.
+6. The stream is resilient: if the connection drops before `done`, the UI unlocks and shows an error instead of hanging, and a cancelled request still saves the partial answer.

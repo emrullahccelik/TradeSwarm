@@ -5,6 +5,7 @@ from langchain.tools import tool
 from binance.exceptions import BinanceAPIException
 from binance.enums import ORDER_TYPE_LIMIT, TIME_IN_FORCE_GTC
 from backend.agents.trader.client import get_binance_client
+from backend.approvals import request_approval
 from backend.config import TRADING_ENABLED
 
 TRADING_DISABLED_MSG = "İşlem yapılmadı: emir gönderme/iptal etme devre dışı (TRADING_ENABLED=false)."
@@ -138,15 +139,19 @@ def create_market_order(symbol: str, side: str, quantity: float) -> str:
     """Piyasa emri (Market Order) gönderir. side: 'BUY' veya 'SELL'. quantity: alınacak/satılacak miktar."""
     if not TRADING_ENABLED:
         return TRADING_DISABLED_MSG
+    side = side.upper()
+    if side not in ("BUY", "SELL"):
+        return "Hata: Geçersiz işlem yönü (side). 'BUY' veya 'SELL' olmalıdır."
+    qty = to_decimal_str(quantity)
+    refusal = request_approval("create_market_order", {"symbol": symbol.upper(), "side": side, "quantity": qty})
+    if refusal:
+        return refusal
     client = get_binance_client()
     try:
-        qty = to_decimal_str(quantity)
-        if side.upper() == "BUY":
+        if side == "BUY":
             order = client.order_market_buy(symbol=symbol.upper(), quantity=qty)
-        elif side.upper() == "SELL":
-            order = client.order_market_sell(symbol=symbol.upper(), quantity=qty)
         else:
-            return "Hata: Geçersiz işlem yönü (side). 'BUY' veya 'SELL' olmalıdır."
+            order = client.order_market_sell(symbol=symbol.upper(), quantity=qty)
 
         avg_price = average_fill_price(order.get("fills") or [])
         return f"İşlem başarılı! Emir ID: {order['orderId']}, Durum: {order['status']}, Ortalama Gerçekleşen Fiyat: {avg_price}"
@@ -158,15 +163,19 @@ def create_limit_order(symbol: str, side: str, quantity: float, price: float) ->
     """Limit emri gönderir. side: 'BUY' veya 'SELL'. Belirlenen fiyattan (price) işleme girer."""
     if not TRADING_ENABLED:
         return TRADING_DISABLED_MSG
+    details = {"symbol": symbol.upper(), "side": side.upper(), "quantity": to_decimal_str(quantity), "price": to_decimal_str(price)}
+    refusal = request_approval("create_limit_order", details)
+    if refusal:
+        return refusal
     client = get_binance_client()
     try:
         order = client.create_order(
-            symbol=symbol.upper(),
-            side=side.upper(),
+            symbol=details["symbol"],
+            side=details["side"],
             type=ORDER_TYPE_LIMIT,
             timeInForce=TIME_IN_FORCE_GTC,
-            quantity=to_decimal_str(quantity),
-            price=to_decimal_str(price)
+            quantity=details["quantity"],
+            price=details["price"]
         )
         return f"Limit emir başarıyla oluşturuldu! Emir ID: {order['orderId']}, Durum: {order['status']}"
     except BinanceAPIException as e:
@@ -177,15 +186,26 @@ def create_oco_order(symbol: str, side: str, quantity: float, price: float, stop
     """OCO (Biri Diğerini İptal Eden) emir gönderir. Hem kâr al (price) hem zarar kes (stop_price) noktası belirlenir."""
     if not TRADING_ENABLED:
         return TRADING_DISABLED_MSG
+    details = {
+        "symbol": symbol.upper(),
+        "side": side.upper(),
+        "quantity": to_decimal_str(quantity),
+        "price": to_decimal_str(price),
+        "stop_price": to_decimal_str(stop_price),
+        "stop_limit_price": to_decimal_str(stop_limit_price),
+    }
+    refusal = request_approval("create_oco_order", details)
+    if refusal:
+        return refusal
     client = get_binance_client()
     try:
         order = client.create_oco_order(
-            symbol=symbol.upper(),
-            side=side.upper(),
-            quantity=to_decimal_str(quantity),
-            price=to_decimal_str(price),
-            stopPrice=to_decimal_str(stop_price),
-            stopLimitPrice=to_decimal_str(stop_limit_price),
+            symbol=details["symbol"],
+            side=details["side"],
+            quantity=details["quantity"],
+            price=details["price"],
+            stopPrice=details["stop_price"],
+            stopLimitPrice=details["stop_limit_price"],
             stopLimitTimeInForce=TIME_IN_FORCE_GTC
         )
         return f"OCO Emir başarıyla oluşturuldu! Emir Listesi ID: {order['orderListId']}"
@@ -197,6 +217,9 @@ def cancel_open_order(symbol: str, order_id: int) -> str:
     """Belirli bir işlem çiftindeki açık emri ID'sine göre iptal eder."""
     if not TRADING_ENABLED:
         return TRADING_DISABLED_MSG
+    refusal = request_approval("cancel_open_order", {"symbol": symbol.upper(), "order_id": order_id})
+    if refusal:
+        return refusal
     client = get_binance_client()
     try:
         result = client.cancel_order(symbol=symbol.upper(), orderId=order_id)
