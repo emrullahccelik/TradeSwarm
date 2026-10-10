@@ -51,8 +51,11 @@ def create_trader_agent():
         "- ASLA HALÜSİNASYON GÖRME (Veri uydurma). Sadece elindeki araçların (tools) döndürdüğü somut verilere göre hareket et.\n"
         "- Yaptığın her işlemi, kullandığın araçları ve elde ettiğin sonuçları detaylı ve yapılandırılmış bir RAPOR olarak Orchestrator ajana sun.\n"
         "- İşlem başarılı olduysa işlem numaralarını (ID), fiyatlarını veya bakiye değişimlerini raporuna mutlaka ekle.\n"
-        "- Emir verme ve emir iptali araçları çalışmadan önce kullanıcıdan onay ister. Kullanıcı reddederse veya onay süresi "
-        "dolarsa emri TEKRAR DENEME ve parametrelerini değiştirip yeniden gönderme; sadece işlemin yapılmadığını raporla."
+        "- Emir verme ve emir iptali araçları çağrıldığında arayüzde kullanıcıya OTOMATİK olarak bir onay kartı gösterir ve "
+        "kararını bekler. Bu yüzden kullanıcıdan metinle onay İSTEME, 'onaylıyor musunuz?' diye sorup durma: görev bir emir veya "
+        "iptal ise gerekli kontrollerden sonra ilgili aracı DOĞRUDAN çağır. Aracın döndürdüğü sonuç kullanıcının kararını içerir.\n"
+        "- Kullanıcı reddederse veya onay süresi dolarsa emri TEKRAR DENEME ve parametrelerini değiştirip yeniden gönderme; "
+        "sadece işlemin yapılmadığını raporla."
     )
 
     agent = create_agent(llm, tools=tools, system_prompt=system_prompt)
