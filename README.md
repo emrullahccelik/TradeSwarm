@@ -28,6 +28,13 @@ The Orchestrator delegates the question to the Researcher sub-agent; its progres
   <img src="docs/assets/agent-demo.gif" alt="Orchestrator delegating to the Researcher sub-agent" width="900" />
 </p>
 
+### Human-in-the-Loop Order Approval
+Before the Trader places or cancels an order, an approval card with the exact symbol, side and quantity appears in the chat. Nothing reaches the exchange until you click *Approve*; rejecting it, letting the 120-second timer run out, or stopping the request leaves the account untouched.
+
+<p align="center">
+  <img src="docs/assets/approval-demo.gif" alt="Approving a Trader market order from the chat" width="900" />
+</p>
+
 ### Hands-Free Voice Mode
 ChatGPT-style voice conversation: the transcript stays on screen, the orb reacts to your voice and to the assistant's speech, and the end of your turn is detected automatically from silence — no push-to-talk. Tap the orb to interrupt.
 
