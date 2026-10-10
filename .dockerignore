@@ -7,3 +7,10 @@ node_modules/
 .next/
 frontend/node_modules/
 frontend/.next/
+# The backend image is built from the repo root; keep unrelated folders out of the build context
+frontend/
+docs/
+tests/
+test/
+.pytest_cache/
+*.md
