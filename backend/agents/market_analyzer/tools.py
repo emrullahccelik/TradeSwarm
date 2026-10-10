@@ -1,8 +1,18 @@
 from langchain.tools import tool
 from pycoingecko import CoinGeckoAPI
+from backend.config import COINGECKO_API_KEY, COINGECKO_API_PLAN
 
-def get_cg_client():
-    return CoinGeckoAPI()
+_cg_client = None
+
+def get_cg_client() -> CoinGeckoAPI:
+    global _cg_client
+    if _cg_client is None:
+        # Anahtar yoksa herkese açık (düşük limitli) API kullanılır
+        if COINGECKO_API_KEY and COINGECKO_API_PLAN == "pro":
+            _cg_client = CoinGeckoAPI(api_key=COINGECKO_API_KEY)
+        else:
+            _cg_client = CoinGeckoAPI(demo_api_key=COINGECKO_API_KEY or "")
+    return _cg_client
 
 @tool
 def get_simple_price(coin_ids: str, vs_currencies: str = 'usd') -> str:

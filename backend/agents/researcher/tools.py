@@ -1,7 +1,10 @@
-from backend.config import BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
+from backend.config import TAVILY_API_KEY
 
 from langchain.tools import tool
 from tavily import TavilyClient
+
+# Uzun sayfalar alt ajanın bağlamını doldurmasın diye sayfa başına metin sınırı
+MAX_PAGE_CHARS = 8000
 
 def get_tavily_client():
     return TavilyClient(api_key=TAVILY_API_KEY)
@@ -35,13 +38,15 @@ def extract_webpage_content(urls: list[str]) -> str:
     Kullanım: Okumak istediğiniz web sayfalarının linklerini liste formatında verin. (ör: ['https://example.com'])"""
     client = get_tavily_client()
     try:
-        response = client.extract(urls)
+        response = client.extract(urls[:3])
         results = response.get('results', [])
         
         formatted = []
         for res in results:
             url = res.get('url', 'Bilinmeyen URL')
-            content = res.get('raw_content', res.get('content', 'İçerik çekilemedi'))
+            content = res.get('raw_content') or res.get('content') or 'İçerik çekilemedi'
+            if len(content) > MAX_PAGE_CHARS:
+                content = content[:MAX_PAGE_CHARS] + f"\n[... metin {MAX_PAGE_CHARS} karakterde kesildi]"
             formatted.append(f"--- KAYNAK: {url} ---\n{content}\n")
             
         if not formatted:

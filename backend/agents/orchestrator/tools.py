@@ -2,9 +2,9 @@ from langchain.tools import tool
 from backend.db import AsyncSessionLocal, ChatSession
 from langchain_core.runnables.config import RunnableConfig
 
-from agents.trader.agent import create_trader_agent
-from agents.researcher.agent import create_researcher_agent
-from agents.market_analyzer.agent import create_market_analyzer_agent
+from backend.agents.trader.agent import create_trader_agent
+from backend.agents.researcher.agent import create_researcher_agent
+from backend.agents.market_analyzer.agent import create_market_analyzer_agent
 
 # Alt ajanları oluştur
 trader_agent = create_trader_agent()

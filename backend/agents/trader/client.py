@@ -1,4 +1,4 @@
-from backend.config import BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
+from backend.config import BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY
 
 import time
 

@@ -13,7 +13,7 @@
 
 TradeSwarm is a **multi-agent AI system** for cryptocurrency trading, market research, and portfolio analysis. An Orchestrator agent interprets natural-language requests (typed or spoken), delegates work to specialized sub-agents, and streams every step — reasoning, tool calls, sub-agent output and the final answer — to a Next.js interface in real time.
 
-> **Safe by design:** the Trader agent executes orders on the **Binance Spot Testnet**, so no real funds are ever at risk.
+> **Safe by design:** the Trader agent executes orders on the **Binance Spot Testnet**, so no real funds are ever at risk. Set `TRADING_ENABLED=false` to make it read-only.
 
 This project focuses on **AI agent orchestration, real-time streaming (SSE), voice interfaces, and full-stack development.**
 
@@ -219,7 +219,7 @@ git clone https://github.com/emrullahccelik/TradeSwarm.git
 cd TradeSwarm
 cp .env.example .env
 ```
-Fill in `.env`. At minimum set `API_AUTH_KEY` (your login password) and the `ORCHESTRATOR_*`, `SUB_AGENT_*` and `TITLE_*` keys; add `STT_API_KEY` for voice mode and dictation.
+Fill in `.env`. At minimum set `API_AUTH_KEY` (your login password), `JWT_SECRET` (token signing key) and the `ORCHESTRATOR_*`, `SUB_AGENT_*` and `TITLE_*` keys; add `STT_API_KEY` for voice mode and dictation.
 
 ### 2. Launch
 ```bash
@@ -229,6 +229,13 @@ docker compose up -d --build
 
 ### 3. Open the App
 Go to **http://localhost:3000** and sign in with your `API_AUTH_KEY`.
+
+### Running Tests
+```bash
+pip install -r requirements-dev.txt
+pytest tests
+```
+The tests mock every external service (Binance, Tavily, LLMs), so no API keys or database are needed.
 
 ## 🧠 Technical Deep-Dive: Event Streaming & UI Hydration
 

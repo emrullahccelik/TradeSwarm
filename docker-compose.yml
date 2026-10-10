@@ -8,7 +8,8 @@ services:
     env_file:
       - .env
     ports:
-      - "5432:5432"
+      # Only reachable from this machine (for running the backend outside Docker), not from the network
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -22,9 +23,11 @@ services:
       - .env
     environment:
       - DB_HOST=db
+    # Development setup: source is mounted and hot-reloaded. For a deployment, drop the
+    # volume and command so the image's own CMD (no --reload) is used.
     volumes:
       - .:/app
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend --reload-dir agents
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend
     depends_on:
       - db
 

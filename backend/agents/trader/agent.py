@@ -1,9 +1,8 @@
-from backend.config import SUB_AGENT_MODEL, SUB_AGENT_API_KEY, SUB_AGENT_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
-
+from backend.config import SUB_AGENT_MODEL, SUB_AGENT_API_KEY, SUB_AGENT_BASE_URL
 
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
-from agents.trader.tools import (
+from backend.agents.trader.tools import (
     get_exchange_info,
     get_symbol_price,
     get_klines,
@@ -16,7 +15,6 @@ from agents.trader.tools import (
     create_oco_order,
     cancel_open_order
 )
-
 
 
 def create_trader_agent():

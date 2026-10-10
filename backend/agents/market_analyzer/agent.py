@@ -1,9 +1,8 @@
-from backend.config import SUB_AGENT_MODEL, SUB_AGENT_API_KEY, SUB_AGENT_BASE_URL, BINANCE_SPOT_API_KEY, BINANCE_SPOT_SECRET_KEY, TAVILY_API_KEY
-
+from backend.config import SUB_AGENT_MODEL, SUB_AGENT_API_KEY, SUB_AGENT_BASE_URL
 
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
-from agents.market_analyzer.tools import (
+from backend.agents.market_analyzer.tools import (
     get_simple_price,
     get_coin_details,
     get_coin_exchanges,
@@ -13,7 +12,6 @@ from agents.market_analyzer.tools import (
     get_trending_search,
     get_public_treasury
 )
-
 
 
 def create_market_analyzer_agent():
