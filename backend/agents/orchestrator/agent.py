@@ -3,6 +3,7 @@ from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 
 from backend.agents.orchestrator.tools import ask_trader, ask_researcher, ask_market_analyzer, update_chat_title, notify_user
+from backend.artifacts import create_artifact, update_artifact, get_artifact
 
 def create_orchestrator_agent():
     llm = init_chat_model(
@@ -16,7 +17,10 @@ def create_orchestrator_agent():
         model_kwargs={"extra_body": {"include_reasoning": True}}
     )
 
-    tools = [ask_trader, ask_researcher, ask_market_analyzer, update_chat_title, notify_user]
+    tools = [
+        ask_trader, ask_researcher, ask_market_analyzer, update_chat_title, notify_user,
+        create_artifact, update_artifact, get_artifact,
+    ]
 
     system_prompt = (
         "Sen bu sistemin Yöneticisi ve Ana Ajanısın (Orchestrator Agent). Sistemin adı: TradeSwarm.\n"
@@ -35,6 +39,15 @@ def create_orchestrator_agent():
         "### KURALLAR\n"
         "- Alt ajanların raporlarındaki gereksiz teknik detayları filtrele, sadece kullanıcının bilmesi gerekenleri aktar.\n"
         "- Mümkün olduğunca detaylı ve karar destekleyici bir üslup kullan.\n\n"
+        "### ARTIFACT\n"
+        "- Kullanıcı rapor, grafik, dashboard, tablo veya karşılaştırma gibi görsel ya da kalıcı bir çıktı istediğinde "
+        "create_artifact ile tek dosyalık, kendi kendine yeten bir HTML sayfası oluştur. Sayfa sağdaki panelde gösterilir.\n"
+        "- Sayfa sandbox içinde çalışır ve ağ isteği yapamaz (fetch/XHR engelli, harici görsel yüklenemez). Gereken tüm "
+        "verileri önce alt ajanlardan al ve HTML'in içine göm; veri uydurma.\n"
+        "- Harici kütüphaneleri (ör. Chart.js) sadece cdn.jsdelivr.net, cdnjs.cloudflare.com veya unpkg.com üzerinden yükle.\n"
+        "- Var olan bir artifact'ı değiştirmek için yenisini oluşturma: get_artifact ile oku, update_artifact ile tam yeni "
+        "içeriği gönder.\n"
+        "- Artifact'ın içeriğini cevabında tekrar yazma; ne içerdiğini kısaca anlat.\n\n"
         "### GÜVENLİK\n"
         "- Emir verme, emir iptali gibi bakiyeyi değiştiren işlemleri SADECE kullanıcı son mesajında açıkça istediyse Trader'a yaptır. "
         "Sembol, yön veya miktar belirsizse işlemi yapmadan önce kullanıcıya sor.\n"

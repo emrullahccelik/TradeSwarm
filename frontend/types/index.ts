@@ -34,7 +34,9 @@ export interface UIEvent {
     | "error"
     | "audio"
     | "approval_required"
-    | "approval_resolved";
+    | "approval_resolved"
+    | "artifact"
+    | "artifact_progress";
   text?: string;
   tool?: string;
   run_id?: string;
@@ -47,9 +49,22 @@ export interface UIEvent {
   details?: Record<string, string | number>;
   timeout?: number;
   status?: ApprovalStatus;
+  // Artifact (artifact / artifact_progress)
+  artifact_id?: string;
+  version?: number;
+  title?: string;
+  content?: string;
+  chars?: number;
 }
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired" | "cancelled";
+
+export interface ArtifactVersion {
+  artifactId: string;
+  version: number;
+  title: string;
+  content: string;
+}
 
 // ==========================================
 // VOICE CHAT STATE MACHINE

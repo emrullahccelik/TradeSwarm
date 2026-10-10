@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey, JSON, Integer, UniqueConstraint
 from datetime import datetime, timezone
 import uuid
 from backend.config import DATABASE_URL
@@ -30,6 +30,18 @@ class ChatMessage(Base):
     # reasoning = Column(Text, nullable=True) # if we want to store reasoning separately
     # Veya UI'ın kullanabileceği tüm datayı (tool calls vb) JSON'da tutabiliriz:
     ui_state = Column(JSON, nullable=True) # Tüm tool, reasoning, content akışlarını burada tutabiliriz
+    created_at = Column(DateTime, default=utc_now)
+
+class Artifact(Base):
+    # Her satır bir artifact'ın bir versiyonudur; aynı artifact_id'ye sahip satırlar versiyon geçmişini oluşturur
+    __tablename__ = "artifacts"
+    __table_args__ = (UniqueConstraint("session_id", "artifact_id", "version"),)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    artifact_id = Column(String, nullable=False)
+    session_id = Column(String, ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
+    version = Column(Integer, nullable=False)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=utc_now)
 
 async def init_db():

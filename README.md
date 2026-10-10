@@ -35,6 +35,17 @@ Before the Trader places or cancels an order, an approval card with the exact sy
   <img src="docs/assets/approval-demo.gif" alt="Approving a Trader market order from the chat" width="900" />
 </p>
 
+### Artifacts
+Ask for a report, chart or dashboard and the Orchestrator builds it as a self-contained HTML page that opens in a side panel next to the chat. While the page is being written, a card in the chat shows its progress; once it is ready you can switch between preview and code, step through versions and download it as an HTML file.
+
+<p align="center">
+  <img src="docs/assets/artifact-preview.png" alt="A Chart.js dashboard artifact open in the side panel" width="900" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/artifact-code.png" alt="The artifact's HTML source in the code tab" width="900" />
+</p>
+
 ### Hands-Free Voice Mode
 ChatGPT-style voice conversation: the transcript stays on screen, the orb reacts to your voice and to the assistant's speech, and the end of your turn is detected automatically from silence — no push-to-talk. Tap the orb to interrupt.
 
@@ -55,6 +66,7 @@ Speak into the composer, confirm with ✓, and edit the transcript before sendin
 *   **Gapless Real-Time Voice Chat (Web Audio API):** Features a fully hands-free, ChatGPT-style voice mode with silence-based end-of-turn detection, plus inline dictation in the composer. It uses MediaRecorder for STT, custom streaming text chunking algorithms for the LLM response, and the **Web Audio API (`AudioBufferSourceNode`)** to play Text-to-Speech (TTS) sentence by sentence without gaps, so the assistant starts speaking before the full answer is generated.
 *   **True Real-Time Streaming UI (Server-Sent Events):** The backend streams execution traces, intermediate tool calls, agent reasoning steps, and final tokens to the client asynchronously. The Next.js frontend reconstructs this state tree dynamically in real-time.
 *   **Modern Frontend:** Built with **Next.js 15 (App Router)**, React 19, and Tailwind CSS v3. Uses a modular component architecture with **shadcn/ui**, `framer-motion` for smooth layout transitions, and comprehensive state management via custom React hooks.
+*   **Artifacts:** The Orchestrator can turn its findings into a self-contained HTML page (report, chart, dashboard) that opens in a side panel next to the chat, with preview/code tabs, version history and download. Pages run in a sandboxed iframe whose Content Security Policy blocks network requests, so a page can neither reach the app's session nor send data out.
 *   **Persistent Chat History:** PostgreSQL (async SQLAlchemy) stores messages, UI events and sessions, so conversations — including tool calls and sub-agent cards — are fully restored after a reload or restart, and chats get an LLM-generated title.
 *   **Human-in-the-Loop Order Approval:** Before the Trader places or cancels an order, the tool pauses and an approval card with the exact symbol, side, quantity and prices appears in the chat. Nothing is sent to the exchange unless you click *Approve*; rejecting, letting the 120-second window expire, or stopping the request leaves the account untouched.
 *   **Secured API:** All endpoints except login are protected with JWT authentication.
@@ -65,7 +77,7 @@ TradeSwarm uses a **supervisor–worker** hierarchy: the Orchestrator talks to t
 
 | Agent | Responsibility | Data source | Model (`.env`) | Tools |
 |---|---|---|---|---|
-| 🧠 **Orchestrator** | Understands the request, picks and calls sub-agents (in parallel when needed), merges their reports into the final answer | Sub-agents | `ORCHESTRATOR_MODEL` | 5 |
+| 🧠 **Orchestrator** | Understands the request, picks and calls sub-agents (in parallel when needed), merges their reports into the final answer | Sub-agents | `ORCHESTRATOR_MODEL` | 8 |
 | 💼 **Trader** | Balances, prices, order book and order management | Binance Spot **Testnet** | `SUB_AGENT_MODEL` | 11 |
 | 🔍 **Researcher** | News, project fundamentals and macro developments from the web | Tavily | `SUB_AGENT_MODEL` | 2 |
 | 📈 **Market Analyzer** | Prices, market data, exchange listings, trends and corporate holdings | CoinGecko | `SUB_AGENT_MODEL` | 8 |
@@ -73,7 +85,7 @@ TradeSwarm uses a **supervisor–worker** hierarchy: the Orchestrator talks to t
 ⚠️ marks tools that change state (orders, chat title) or send something outside the app. 🛡️ marks tools that only run after you approve them in the chat.
 
 <details>
-<summary><strong>🧠 Orchestrator</strong> — 5 tools</summary>
+<summary><strong>🧠 Orchestrator</strong> — 8 tools</summary>
 
 | Tool | What it does |
 |---|---|
@@ -82,6 +94,9 @@ TradeSwarm uses a **supervisor–worker** hierarchy: the Orchestrator talks to t
 | `ask_market_analyzer(query)` | Delegates price, market and statistics questions to the Market Analyzer agent |
 | `update_chat_title(new_title)` ⚠️ | Renames the current chat when the topic changes or the user asks |
 | `notify_user(message)` ⚠️ | Sends a summary of key analyses or executed trades to the user via Telegram |
+| `create_artifact(title, content)` | Creates a self-contained HTML page (report, chart, dashboard) shown in the side panel |
+| `update_artifact(artifact_id, content, title)` | Saves a new version of an existing artifact |
+| `get_artifact(artifact_id)` | Reads the latest version of an artifact before editing it |
 
 </details>
 
@@ -250,7 +265,7 @@ The tests mock every external service (Binance, Tavily, LLMs), so no API keys or
 One of the main engineering challenges in this project was mapping LangGraph's deeply nested, asynchronous run tree (orchestrator → sub-agent → tools) to a readable chat UI.
 
 **The Solution:**
-1. The FastAPI backend consumes LangGraph's `astream_events` (v2) and flattens them into a small set of `UIEvent` types: `reasoning`, `content`, `tool_start`/`tool_end`, `sub_agent_start`/`sub_agent_end`, `done` and `error`.
+1. The FastAPI backend consumes LangGraph's `astream_events` (v2) and flattens them into a small set of `UIEvent` types: `reasoning`, `content`, `tool_start`/`tool_end`, `sub_agent_start`/`sub_agent_end`, `approval_required`/`approval_resolved`, `artifact`/`artifact_progress`, `done` and `error`.
 2. Every event carries its `run_id` and `parent_ids`; text streamed by a sub-agent is tagged with that sub-agent's run id so it never leaks into the main answer.
 3. The frontend turns the event list into a **chronological timeline**: reasoning blocks, tool badges, sub-agent cards and answer text appear in the order they happened. Events whose `parent_ids` contain a running sub-agent are attached to that agent's card.
 4. The same event list is persisted with each message, so a reloaded conversation renders exactly like the live one.

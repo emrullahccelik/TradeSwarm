@@ -10,6 +10,7 @@ import { ToolBadge } from "./tool-badge";
 import { SubAgentCard } from "./sub-agent-card";
 import { ApprovalCard } from "./approval-card";
 import { MessageActions } from "./message-actions";
+import { ArtifactCard } from "@/components/artifact/artifact-card";
 import { cn } from "@/lib/utils";
 
 interface MessageBubbleProps {
@@ -42,13 +43,21 @@ interface ApprovalItem {
   timeout?: number;
 }
 
+type ArtifactItem =
+  | { kind: "artifact"; status: "writing"; tool: string; chars: number }
+  | { kind: "artifact"; status: "ready"; artifactId: string; version: number; title: string };
+
 type TimelineItem =
   | { kind: "reasoning"; text: string }
   | { kind: "content"; text: string }
   | { kind: "error"; text: string }
   | ({ kind: "tool" } & ToolItem)
   | SubAgentItem
-  | ApprovalItem;
+  | ApprovalItem
+  | ArtifactItem;
+
+// Bu araçların sonucu artifact kartında gösterildiği için ayrıca araç rozeti çizilmez
+const ARTIFACT_TOOLS = ["create_artifact", "update_artifact"];
 
 // SSE event'lerini geliş sırasına göre gösterilecek bloklara dönüştürür
 function buildTimeline(uiEvents: UIEvent[], finalContent: string, isStreaming: boolean): TimelineItem[] {
@@ -57,6 +66,8 @@ function buildTimeline(uiEvents: UIEvent[], finalContent: string, isStreaming: b
   const tools: Record<string, ToolItem> = {};
   const approvals: Record<string, ApprovalItem> = {};
   let hasMainContentEvents = false;
+  // Yazılmakta olan artifact'ın yer tutucusu; artifact olayı gelince aynı yerde kartla değiştirilir
+  let writingArtifact: number | null = null;
 
   const appendText = (kind: "reasoning" | "content", text: string) => {
     const last = timeline[timeline.length - 1];
@@ -94,7 +105,7 @@ function buildTimeline(uiEvents: UIEvent[], finalContent: string, isStreaming: b
         }
         break;
       case "tool_start":
-        if (event.run_id && event.tool) {
+        if (event.run_id && event.tool && !ARTIFACT_TOOLS.includes(event.tool)) {
           const tool = { kind: "tool" as const, runId: event.run_id, name: event.tool, status: "running" as const };
           tools[event.run_id] = tool;
           if (agent) agent.tools.push(tool);
@@ -140,10 +151,42 @@ function buildTimeline(uiEvents: UIEvent[], finalContent: string, isStreaming: b
           approvals[event.approval_id].status = event.status;
         }
         break;
+      case "artifact_progress": {
+        const item: ArtifactItem = { kind: "artifact", status: "writing", tool: event.tool || "", chars: event.chars || 0 };
+        if (writingArtifact === null) {
+          writingArtifact = timeline.length;
+          timeline.push(item);
+        } else {
+          timeline[writingArtifact] = item;
+        }
+        break;
+      }
+      case "artifact":
+        if (event.artifact_id && event.version) {
+          const item: ArtifactItem = {
+            kind: "artifact",
+            status: "ready",
+            artifactId: event.artifact_id,
+            version: event.version,
+            title: event.title || "Artifact",
+          };
+          if (writingArtifact === null) {
+            timeline.push(item);
+          } else {
+            timeline[writingArtifact] = item;
+            writingArtifact = null;
+          }
+        }
+        break;
       case "error":
         timeline.push({ kind: "error", text: event.text || "Bilinmeyen hata" });
         break;
     }
+  }
+
+  // Akış artifact tamamlanmadan bittiyse (ör. iptal, çıktı sınırı) yarım kalan yer tutucu kaldırılır
+  if (!isStreaming && writingArtifact !== null) {
+    timeline.splice(writingArtifact, 1);
   }
 
   // Akış sonuç gelmeden bittiyse (ör. istek iptal edildi) backend bekleyen onayı zaten reddetmiştir
@@ -213,6 +256,21 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               status={item.status}
               timeout={item.timeout}
             />
+          );
+          break;
+        case "artifact":
+          elements.push(
+            item.status === "writing" ? (
+              <ArtifactCard key={`artifact-writing-${index}`} status="writing" tool={item.tool} chars={item.chars} />
+            ) : (
+              <ArtifactCard
+                key={`artifact-${item.artifactId}-${item.version}`}
+                status="ready"
+                artifactId={item.artifactId}
+                version={item.version}
+                title={item.title}
+              />
+            )
           );
           break;
         case "error":

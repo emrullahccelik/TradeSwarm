@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from langchain.chat_models import init_chat_model
 from sqlalchemy.future import select
 
-from backend import approvals, auth, voice
+from backend import approvals, artifacts, auth, voice
 from backend.auth import verify_jwt
 from backend.agents.orchestrator.agent import create_orchestrator_agent
 from backend.config import TITLE_MODEL, TITLE_API_KEY, TITLE_BASE_URL, CORS_ORIGINS
@@ -78,6 +78,8 @@ async def generate_chat_events(message: str, session_id: str, db):
     assistant_content = ""
     ui_state = []
     active_sub_agents = set()
+    # Yazılmakta olan artifact tool çağrıları: (model run_id, tool çağrısı index'i) -> {"tool", "chars"}
+    artifact_writes = {}
     # Bu isteğin emir onaylarını gruplar; istek biterse veya iptal edilirse bekleyen onaylar reddedilir
     request_id = str(uuid.uuid4())
 
@@ -96,6 +98,11 @@ async def generate_chat_events(message: str, session_id: str, db):
         
         # Ajan durumsuzdur (checkpointer yok): hafızanın tek kaynağı DB'deki geçmiştir, şu anki mesaj da dahil
         formatted_messages = [{"role": m.role, "content": m.content} for m in past_msgs if m.content]
+
+        # Geçmişte sadece mesaj metinleri var; modelin var olan artifact'ları güncelleyebilmesi için id'leri son mesajdan önce bildirilir
+        artifacts_note = artifacts.artifacts_context(await artifacts.list_session_artifacts(db, session_id))
+        if artifacts_note:
+            formatted_messages.insert(len(formatted_messages) - 1, {"role": "system", "content": artifacts_note})
 
         # thread_id, update_chat_title aracının hangi sohbeti güncelleyeceğini bilmesi için geçirilir
         config = {"configurable": {"thread_id": session_id, "request_id": request_id}}
@@ -137,8 +144,8 @@ async def generate_chat_events(message: str, session_id: str, db):
                     ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
                 
-            elif kind == "on_custom_event" and name in ("approval_required", "approval_resolved"):
-                # Emir onay kartı: alt ajanın içinden gelse de kullanıcı görsün diye ana akışta gösterilir
+            elif kind == "on_custom_event" and name in ("approval_required", "approval_resolved", "artifact"):
+                # Emir onay kartı (alt ajanın içinden gelse de kullanıcı görsün diye ana akışta gösterilir) ve artifact'lar
                 payload = {"type": name, **event["data"]}
                 ui_state.append(payload)
                 yield f"data: {json.dumps(payload)}\n\n"
@@ -151,7 +158,22 @@ async def generate_chat_events(message: str, session_id: str, db):
                 chunk = event["data"].get("chunk")
                 if not chunk:
                     continue
-                
+
+                # Artifact içeriği tool argümanı olarak üretilir ve uzun sürer; bu sırada arayüze ilerleme bildirilir.
+                # Geçici bir göstergedir, ui_state'e kaydedilmez.
+                if not sub_agent_id:
+                    for tool_chunk in getattr(chunk, "tool_call_chunks", None) or []:
+                        key = (event.get("run_id"), tool_chunk.get("index"))
+                        if tool_chunk.get("name") in artifacts.ARTIFACT_TOOLS:
+                            artifact_writes[key] = {"tool": tool_chunk["name"], "chars": 0}
+                            yield f"data: {json.dumps({'type': 'artifact_progress', **artifact_writes[key]})}\n\n"
+                        write = artifact_writes.get(key)
+                        if write and tool_chunk.get("args"):
+                            before = write["chars"]
+                            write["chars"] += len(tool_chunk["args"])
+                            if write["chars"] // 1000 > before // 1000:
+                                yield f"data: {json.dumps({'type': 'artifact_progress', **write})}\n\n"
+
                 reasoning_texts = []
                 content_texts = []
                 
