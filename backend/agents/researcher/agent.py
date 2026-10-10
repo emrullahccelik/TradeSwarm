@@ -1,4 +1,4 @@
-from backend.config import SUB_AGENT_MODEL, SUB_AGENT_API_KEY, SUB_AGENT_BASE_URL
+from backend.config import SUB_AGENT_MODEL, SUB_AGENT_API_KEY, SUB_AGENT_BASE_URL, SUB_AGENT_MAX_TOKENS
 
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
@@ -10,7 +10,8 @@ def create_researcher_agent():
         model=SUB_AGENT_MODEL,
         api_key=SUB_AGENT_API_KEY,
         base_url=SUB_AGENT_BASE_URL,
-        temperature=0.3
+        temperature=0.3,
+        max_tokens=SUB_AGENT_MAX_TOKENS
     )
 
     tools = [search_market_news, extract_webpage_content]

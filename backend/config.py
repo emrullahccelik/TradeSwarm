@@ -16,11 +16,14 @@ DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HO
 ORCHESTRATOR_BASE_URL = os.getenv("ORCHESTRATOR_BASE_URL", "https://openrouter.ai/api/v1")
 ORCHESTRATOR_API_KEY = os.getenv("ORCHESTRATOR_API_KEY")
 ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", "deepseek/deepseek-v4-flash")
+# Tek bir model cevabının üst sınırı (reasoning token'ları dahil); modelin sonsuz çıktı döngüsüne girmesini engeller
+ORCHESTRATOR_MAX_TOKENS = int(os.getenv("ORCHESTRATOR_MAX_TOKENS", "8192"))
 
 # SUB AGENT LLM CONFIG
 SUB_AGENT_BASE_URL = os.getenv("SUB_AGENT_BASE_URL", "https://openrouter.ai/api/v1")
 SUB_AGENT_API_KEY = os.getenv("SUB_AGENT_API_KEY")
 SUB_AGENT_MODEL = os.getenv("SUB_AGENT_MODEL", "deepseek/deepseek-v4-flash")
+SUB_AGENT_MAX_TOKENS = int(os.getenv("SUB_AGENT_MAX_TOKENS", "8192"))
 
 # TITLE GENERATOR LLM CONFIG
 TITLE_BASE_URL = os.getenv("TITLE_BASE_URL", "https://openrouter.ai/api/v1")

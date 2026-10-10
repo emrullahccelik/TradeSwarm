@@ -1,4 +1,4 @@
-from backend.config import ORCHESTRATOR_MODEL, ORCHESTRATOR_API_KEY, ORCHESTRATOR_BASE_URL
+from backend.config import ORCHESTRATOR_MODEL, ORCHESTRATOR_API_KEY, ORCHESTRATOR_BASE_URL, ORCHESTRATOR_MAX_TOKENS
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 
@@ -11,6 +11,7 @@ def create_orchestrator_agent():
         api_key=ORCHESTRATOR_API_KEY,
         base_url=ORCHESTRATOR_BASE_URL,
         temperature=0.2,
+        max_tokens=ORCHESTRATOR_MAX_TOKENS,
         streaming=True,
         model_kwargs={"extra_body": {"include_reasoning": True}}
     )
